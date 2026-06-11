@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: estuda2-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: estuda2
+      POSTGRES_PASSWORD: estuda2
+      POSTGRES_DB: estuda2
+    ports:
+      - "5432:5432"
+    volumes:
+      - estuda2_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U estuda2 -d estuda2"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  estuda2_postgres_data:
+
