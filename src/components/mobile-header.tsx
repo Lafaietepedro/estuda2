@@ -14,7 +14,12 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-export function MobileHeader() {
+type MobileHeaderProps = {
+  examName: string;
+  users: { id: string; name: string }[];
+};
+
+export function MobileHeader({ examName, users }: MobileHeaderProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -35,7 +40,11 @@ export function MobileHeader() {
           <SheetDescription className="sr-only">
             Escolha uma área do Estuda2 para navegar.
           </SheetDescription>
-          <SidebarNavigation onNavigate={() => setOpen(false)} />
+          <SidebarNavigation
+            examName={examName}
+            users={users}
+            onNavigate={() => setOpen(false)}
+          />
         </SheetContent>
       </Sheet>
     </header>

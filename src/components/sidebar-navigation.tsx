@@ -8,12 +8,16 @@ import {
   CircleHelp,
   ClipboardList,
   LayoutDashboard,
+  LogOut,
   Scale,
+  Settings,
   TimerReset,
   type LucideIcon,
 } from "lucide-react";
 
 import { AppLogo } from "@/components/app-logo";
+import { logout } from "@/app/actions";
+import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 type NavigationItem = {
@@ -29,16 +33,30 @@ const navigationItems: NavigationItem[] = [
   { label: "Questões", href: "/questoes", icon: CircleHelp },
   { label: "Relatórios", href: "/relatorios", icon: BarChart3 },
   { label: "Comparativo", href: "/comparativo", icon: Scale },
+  { label: "Configurações", href: "/configuracoes", icon: Settings },
 ];
 
 type SidebarNavigationProps = {
+  examName: string;
+  users: { id: string; name: string }[];
   onNavigate?: () => void;
 };
 
 export function SidebarNavigation({
+  examName,
+  users,
   onNavigate,
 }: SidebarNavigationProps) {
   const pathname = usePathname();
+  const firstUser = users[0]?.name ?? "Pessoa 1";
+  const secondUser = users[1]?.name ?? "Pessoa 2";
+  const initials = (name: string) =>
+    name
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0])
+      .join("")
+      .toUpperCase();
 
   return (
     <div className="flex h-full flex-col bg-sidebar text-sidebar-foreground">
@@ -57,7 +75,7 @@ export function SidebarNavigation({
                 Concurso atual
               </p>
               <p className="truncate text-sm font-semibold text-foreground">
-                Tribunal Regional Federal
+                {examName}
               </p>
             </div>
           </div>
@@ -103,21 +121,32 @@ export function SidebarNavigation({
         <div className="flex items-center gap-3 rounded-xl bg-sidebar-accent/70 p-3">
           <div className="flex -space-x-2">
             <span className="flex size-9 items-center justify-center rounded-full border-2 border-sidebar bg-violet-100 text-xs font-bold text-violet-700">
-              AM
+              {initials(firstUser)}
             </span>
             <span className="flex size-9 items-center justify-center rounded-full border-2 border-sidebar bg-emerald-100 text-xs font-bold text-emerald-700">
-              BC
+              {initials(secondUser)}
             </span>
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-semibold text-foreground">Ana & Bruno</p>
+            <p className="truncate text-sm font-semibold text-foreground">
+              {firstUser} & {secondUser}
+            </p>
             <p className="truncate text-xs text-muted-foreground">
               Dupla de estudos
             </p>
           </div>
         </div>
+        <form action={logout} className="mt-2">
+          <Button
+            type="submit"
+            variant="ghost"
+            className="w-full justify-start text-muted-foreground"
+          >
+            <LogOut aria-hidden="true" />
+            Sair
+          </Button>
+        </form>
       </div>
     </div>
   );
 }
-

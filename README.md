@@ -44,6 +44,9 @@ Aplicacao full stack para acompanhar estudos de concurso em dupla.
 
 Acesse [http://localhost:3000](http://localhost:3000).
 
+Quando `APP_PASSWORD` estiver definida, o app exige a senha compartilhada da
+dupla. Use um valor longo e diferente de `AUTH_SECRET`.
+
 ## Scripts
 
 - `npm run dev`: inicia o servidor de desenvolvimento.
@@ -53,3 +56,8 @@ Acesse [http://localhost:3000](http://localhost:3000).
 - `npm run db:push`: aplica o schema no banco local.
 - `npm run db:seed`: popula os dados iniciais.
 
+## Producao
+
+O projeto esta preparado para deploy na Vercel com PostgreSQL. Configure
+`DATABASE_URL`, `APP_PASSWORD` e `AUTH_SECRET` no ambiente de producao, aplique
+as migracoes com `npx prisma migrate deploy` e execute o seed uma vez.

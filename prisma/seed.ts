@@ -12,35 +12,32 @@ const subjects = [
 ];
 
 async function main() {
-  const [ana, bruno] = await Promise.all([
+  const [firstUser, secondUser] = await Promise.all([
     prisma.user.upsert({
-      where: { email: "ana.martins@estuda2.local" },
-      update: { name: "Ana Martins" },
+      where: { email: "pessoa1@estuda2.local" },
+      update: {},
       create: {
-        name: "Ana Martins",
-        email: "ana.martins@estuda2.local",
+        name: "Pessoa 1",
+        email: "pessoa1@estuda2.local",
       },
     }),
     prisma.user.upsert({
-      where: { email: "bruno.costa@estuda2.local" },
-      update: { name: "Bruno Costa" },
+      where: { email: "pessoa2@estuda2.local" },
+      update: {},
       create: {
-        name: "Bruno Costa",
-        email: "bruno.costa@estuda2.local",
+        name: "Pessoa 2",
+        email: "pessoa2@estuda2.local",
       },
     }),
   ]);
 
   const exam = await prisma.exam.upsert({
-    where: { slug: "trf-analista-judiciario" },
-    update: {
-      name: "Tribunal Regional Federal",
-      description: "Preparação em dupla para Analista Judiciário.",
-    },
+    where: { slug: "nosso-concurso" },
+    update: {},
     create: {
-      name: "Tribunal Regional Federal",
-      slug: "trf-analista-judiciario",
-      description: "Preparação em dupla para Analista Judiciário.",
+      name: "Nosso concurso",
+      slug: "nosso-concurso",
+      description: "Preparação em dupla.",
     },
   });
 
@@ -48,13 +45,13 @@ async function main() {
     prisma.examMembership.upsert({
       where: {
         userId_examId: {
-          userId: ana.id,
+          userId: firstUser.id,
           examId: exam.id,
         },
       },
       update: { role: ExamRole.OWNER },
       create: {
-        userId: ana.id,
+        userId: firstUser.id,
         examId: exam.id,
         role: ExamRole.OWNER,
       },
@@ -62,13 +59,13 @@ async function main() {
     prisma.examMembership.upsert({
       where: {
         userId_examId: {
-          userId: bruno.id,
+          userId: secondUser.id,
           examId: exam.id,
         },
       },
       update: { role: ExamRole.MEMBER },
       create: {
-        userId: bruno.id,
+        userId: secondUser.id,
         examId: exam.id,
         role: ExamRole.MEMBER,
       },
@@ -104,4 +101,3 @@ main()
   .finally(async () => {
     await prisma.$disconnect();
   });
-
