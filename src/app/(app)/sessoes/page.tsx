@@ -6,7 +6,7 @@ import {
   StudySessionEditForm,
   StudySessionForm,
 } from "@/components/record-forms";
-import { Button } from "@/components/ui/button";
+import { ConfirmSubmitButton } from "@/components/form-controls";
 import { getWorkspace } from "@/lib/data";
 import { formatDate, formatDateInput, minutesToLabel } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
@@ -117,15 +117,15 @@ export default async function SessionsPage() {
                     </details>
                     <form action={deleteStudySession}>
                       <input type="hidden" name="id" value={session.id} />
-                      <Button
-                        type="submit"
+                      <ConfirmSubmitButton
                         variant="ghost"
                         size="icon"
                         aria-label="Excluir sessão"
                         className="text-muted-foreground hover:text-destructive"
+                        confirmMessage="Excluir esta sessão de estudo? Essa ação não pode ser desfeita."
                       >
                         <Trash2 aria-hidden="true" />
-                      </Button>
+                      </ConfirmSubmitButton>
                     </form>
                   </div>
                 )}

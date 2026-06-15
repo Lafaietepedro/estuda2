@@ -6,7 +6,7 @@ import {
   QuestionLogEditForm,
   QuestionLogForm,
 } from "@/components/record-forms";
-import { Button } from "@/components/ui/button";
+import { ConfirmSubmitButton } from "@/components/form-controls";
 import { getWorkspace } from "@/lib/data";
 import { formatDate, formatDateInput } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
@@ -127,15 +127,15 @@ export default async function QuestionsPage() {
                         </details>
                         <form action={deleteQuestionLog}>
                           <input type="hidden" name="id" value={log.id} />
-                          <Button
-                            type="submit"
+                          <ConfirmSubmitButton
                             variant="ghost"
                             size="icon"
                             aria-label="Excluir registro"
                             className="text-muted-foreground hover:text-destructive"
+                            confirmMessage="Excluir este registro de questões? Essa ação não pode ser desfeita."
                           >
                             <Trash2 aria-hidden="true" />
-                          </Button>
+                          </ConfirmSubmitButton>
                         </form>
                       </>
                     )}

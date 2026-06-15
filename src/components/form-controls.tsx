@@ -58,3 +58,20 @@ export function SubmitButton({
     </Button>
   );
 }
+
+export function ConfirmSubmitButton({
+  confirmMessage,
+  ...props
+}: ButtonProps & { confirmMessage: string }) {
+  return (
+    <Button
+      type="submit"
+      {...props}
+      onClick={(event) => {
+        if (!window.confirm(confirmMessage)) {
+          event.preventDefault();
+        }
+      }}
+    />
+  );
+}

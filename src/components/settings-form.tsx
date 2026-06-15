@@ -72,6 +72,7 @@ export function SettingsForm({ exam, users }: SettingsFormProps) {
                   autoComplete="new-password"
                   className={`${fieldClassName} mt-1.5`}
                 />
+                <FieldError errors={state.errors} name={`${prefix}Password`} />
               </label>
               <label className="block text-sm font-medium">
                 Meta semanal individual

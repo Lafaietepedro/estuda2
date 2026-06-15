@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   ArrowUpRight,
   BookOpen,
+  CalendarDays,
   CircleCheck,
   Clock3,
   Flame,
@@ -45,11 +46,15 @@ export default async function DashboardPage() {
     await Promise.all([
       prisma.studySession.findMany({
         where: { examId: workspace.id, studiedAt: { gte: sevenDaysAgo } },
-        select: { durationMinutes: true, studiedAt: true },
+        select: { durationMinutes: true, studiedAt: true, userId: true },
       }),
       prisma.questionLog.findMany({
         where: { examId: workspace.id, answeredAt: { gte: weekStart } },
-        select: { questionsAnswered: true, correctAnswers: true },
+        select: {
+          questionsAnswered: true,
+          correctAnswers: true,
+          userId: true,
+        },
       }),
       prisma.studySession.findMany({
         where: { examId: workspace.id },
@@ -81,6 +86,29 @@ export default async function DashboardPage() {
   );
   const accuracy = questionsAnswered
     ? Math.round((correctAnswers / questionsAnswered) * 100)
+    : 0;
+  const personalSessions = weekSessions.filter(
+    (session) =>
+      session.userId === workspace.currentUser.id &&
+      session.studiedAt >= weekStart,
+  );
+  const personalQuestions = weekQuestions.filter(
+    (log) => log.userId === workspace.currentUser.id,
+  );
+  const personalMinutes = personalSessions.reduce(
+    (total, session) => total + session.durationMinutes,
+    0,
+  );
+  const personalAnswered = personalQuestions.reduce(
+    (total, log) => total + log.questionsAnswered,
+    0,
+  );
+  const personalCorrect = personalQuestions.reduce(
+    (total, log) => total + log.correctAnswers,
+    0,
+  );
+  const personalAccuracy = personalAnswered
+    ? Math.round((personalCorrect / personalAnswered) * 100)
     : 0;
 
   const dayTotals = new Map<string, number>();
@@ -128,18 +156,29 @@ export default async function DashboardPage() {
 
   const summaryCards = [
     {
-      label: "Tempo estudado",
-      value: minutesToLabel(weekMinutes),
-      helper: "Nesta semana",
+      label: "Meu tempo",
+      value: minutesToLabel(personalMinutes),
+      helper: "Minha semana",
       icon: Clock3,
       accent: "bg-violet-100 text-violet-700",
     },
     {
-      label: "Questões resolvidas",
-      value: String(questionsAnswered),
-      helper: questionsAnswered ? `${accuracy}% de acertos` : "Nesta semana",
+      label: "Minhas questões",
+      value: String(personalAnswered),
+      helper: personalAnswered
+        ? `${personalAccuracy}% de acertos`
+        : "Minha semana",
       icon: CircleCheck,
       accent: "bg-emerald-100 text-emerald-700",
+    },
+    {
+      label: "Tempo da dupla",
+      value: minutesToLabel(weekMinutes),
+      helper: questionsAnswered
+        ? `${questionsAnswered} questões · ${accuracy}%`
+        : "Nesta semana",
+      icon: Target,
+      accent: "bg-amber-100 text-amber-700",
     },
     {
       label: "Matérias ativas",
@@ -152,6 +191,23 @@ export default async function DashboardPage() {
     },
   ];
   const weeklyGoalMinutes = workspace.weeklyGoalMinutes;
+  const personalGoalMinutes = workspace.currentMembership.weeklyGoalMinutes;
+  const daysUntilExam = workspace.examDate
+    ? Math.ceil(
+        (workspace.examDate.getTime() - today.getTime()) /
+          (1000 * 60 * 60 * 24),
+      )
+    : null;
+  const examCountdown =
+    daysUntilExam === null
+      ? null
+      : daysUntilExam > 1
+        ? `${daysUntilExam} dias para a prova`
+        : daysUntilExam === 1
+          ? "A prova é amanhã"
+          : daysUntilExam === 0
+            ? "A prova é hoje"
+            : "Data da prova concluída";
 
   return (
     <div className="space-y-7">
@@ -166,6 +222,12 @@ export default async function DashboardPage() {
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">
             Cada registro deixa o caminho até {workspace.name} mais claro.
           </p>
+          {examCountdown && (
+            <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">
+              <CalendarDays className="size-4" aria-hidden="true" />
+              {examCountdown}
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap gap-2">
           <Link
@@ -182,7 +244,7 @@ export default async function DashboardPage() {
         </div>
       </section>
 
-      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
+      <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
         {summaryCards.map((card) => {
           const Icon = card.icon;
           return (
@@ -278,6 +340,28 @@ export default async function DashboardPage() {
               }}
             />
           </div>
+          {personalGoalMinutes && (
+            <div className="mt-5 border-t border-white/10 pt-5">
+              <div className="flex items-center justify-between gap-3 text-xs text-slate-300">
+                <span>Minha meta</span>
+                <span>
+                  {minutesToLabel(personalMinutes)} /{" "}
+                  {minutesToLabel(personalGoalMinutes)}
+                </span>
+              </div>
+              <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                <div
+                  className="h-full rounded-full bg-emerald-400"
+                  style={{
+                    width: `${Math.min(
+                      100,
+                      (personalMinutes / personalGoalMinutes) * 100,
+                    )}%`,
+                  }}
+                />
+              </div>
+            </div>
+          )}
           <Link
             href="/sessoes"
             className="mt-7 flex items-center gap-2 text-sm font-semibold"

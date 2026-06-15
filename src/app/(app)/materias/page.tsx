@@ -17,6 +17,7 @@ import {
   SubjectEditForm,
   SubjectForm,
 } from "@/components/record-forms";
+import { ConfirmSubmitButton } from "@/components/form-controls";
 import { Button } from "@/components/ui/button";
 import { getWorkspace } from "@/lib/data";
 import { minutesToLabel, startOfCurrentWeek } from "@/lib/dates";
@@ -212,15 +213,15 @@ export default async function SubjectsPage() {
             {historyCount === 0 && (
               <form action={deleteSubject}>
                 <input type="hidden" name="id" value={subject.id} />
-                <Button
-                  type="submit"
+                <ConfirmSubmitButton
                   variant="ghost"
                   size="icon"
                   aria-label="Excluir matéria sem histórico"
                   className="text-muted-foreground hover:text-destructive"
+                  confirmMessage={`Excluir definitivamente a matéria ${subject.name}?`}
                 >
                   <Trash2 aria-hidden="true" />
-                </Button>
+                </ConfirmSubmitButton>
               </form>
             )}
           </div>
