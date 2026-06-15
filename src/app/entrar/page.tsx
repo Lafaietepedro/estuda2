@@ -8,6 +8,8 @@ export const metadata = {
 };
 
 export default function LoginPage() {
+  const requiresLogin = Boolean(process.env.APP_LOGIN);
+
   return (
     <main className="flex min-h-screen items-center justify-center bg-muted/40 px-4 py-10">
       <section className="w-full max-w-md rounded-3xl border bg-card p-6 shadow-xl shadow-slate-200/60 sm:p-8">
@@ -19,10 +21,10 @@ export default function LoginPage() {
           Espaço da dupla
         </h1>
         <p className="mt-2 text-sm leading-6 text-muted-foreground">
-          Use a senha compartilhada para acessar os registros de estudo.
+          Use as credenciais compartilhadas para acessar os registros de estudo.
         </p>
         <div className="mt-6">
-          <LoginForm />
+          <LoginForm requiresLogin={requiresLogin} />
         </div>
       </section>
     </main>

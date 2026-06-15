@@ -1,3 +1,5 @@
+import { Sparkles } from "lucide-react";
+
 import { PageHeading } from "@/components/page-heading";
 import { SettingsForm } from "@/components/settings-form";
 import { getWorkspace } from "@/lib/data";
@@ -9,7 +11,14 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function SettingsPage() {
+type SettingsPageProps = {
+  searchParams: Promise<{ "primeiro-acesso"?: string }>;
+};
+
+export default async function SettingsPage({
+  searchParams,
+}: SettingsPageProps) {
+  const query = await searchParams;
   const workspace = await getWorkspace();
   const users = workspace.memberships.map((membership) => ({
     id: membership.user.id,
@@ -27,6 +36,19 @@ export default async function SettingsPage() {
         title="Configurações"
         description="Ajuste os nomes da dupla e o objetivo que vocês estão perseguindo."
       />
+
+      {query["primeiro-acesso"] === "1" && (
+        <div className="flex gap-3 rounded-2xl border border-violet-200 bg-violet-50 p-4 text-violet-950">
+          <Sparkles className="mt-0.5 size-5 shrink-0 text-violet-600" />
+          <div>
+            <p className="font-semibold">Vamos preparar o espaço de vocês</p>
+            <p className="mt-1 text-sm leading-6 text-violet-800">
+              Informe os nomes da dupla e o concurso. Depois disso, vocês já
+              podem começar a registrar estudos.
+            </p>
+          </div>
+        </div>
+      )}
 
       <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
         <SettingsForm

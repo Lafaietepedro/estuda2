@@ -1,9 +1,10 @@
 import { NextResponse, type NextRequest } from "next/server";
 
 async function expectedSessionToken() {
+  const login = process.env.APP_LOGIN ?? "";
   const password = process.env.APP_PASSWORD ?? "";
   const secret = process.env.AUTH_SECRET ?? "";
-  const data = new TextEncoder().encode(`${password}:${secret}`);
+  const data = new TextEncoder().encode(`${login}:${password}:${secret}`);
   const digest = await crypto.subtle.digest("SHA-256", data);
 
   return Array.from(new Uint8Array(digest))

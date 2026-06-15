@@ -44,8 +44,9 @@ Aplicacao full stack para acompanhar estudos de concurso em dupla.
 
 Acesse [http://localhost:3000](http://localhost:3000).
 
-Quando `APP_PASSWORD` estiver definida, o app exige a senha compartilhada da
-dupla. Use um valor longo e diferente de `AUTH_SECRET`.
+Quando `APP_PASSWORD` estiver definida, o app exige autenticação. `APP_LOGIN`
+é opcional; quando definido, login e senha são obrigatórios. Use em produção
+valores fortes e um `AUTH_SECRET` diferente.
 
 ## Scripts
 
@@ -59,5 +60,6 @@ dupla. Use um valor longo e diferente de `AUTH_SECRET`.
 ## Producao
 
 O projeto esta preparado para deploy na Vercel com PostgreSQL. Configure
-`DATABASE_URL`, `APP_PASSWORD` e `AUTH_SECRET` no ambiente de producao, aplique
-as migracoes com `npx prisma migrate deploy` e execute o seed uma vez.
+`DATABASE_URL`, `APP_LOGIN`, `APP_PASSWORD` e `AUTH_SECRET` no ambiente de
+producao, aplique as migracoes com `npx prisma migrate deploy` e execute o seed
+uma vez.

@@ -284,32 +284,46 @@ export async function updateSettings(
     ]);
 
     revalidatePath("/", "layout");
-    return { status: "success", message: "Configurações salvas." };
   } catch {
     return {
       status: "error",
       message: "Não foi possível salvar as configurações.",
     };
   }
+
+  redirect("/");
 }
 
 function sessionToken() {
+  const login = process.env.APP_LOGIN ?? "";
   const password = process.env.APP_PASSWORD ?? "";
   const secret = process.env.AUTH_SECRET ?? "";
-  return createHash("sha256").update(`${password}:${secret}`).digest("hex");
+  return createHash("sha256")
+    .update(`${login}:${password}:${secret}`)
+    .digest("hex");
 }
 
 export async function login(
   _previousState: FormState,
   formData: FormData,
 ): Promise<FormState> {
+  const expectedLogin = process.env.APP_LOGIN;
   const parsed = z
-    .object({ password: z.string().min(1, "Informe a senha.") })
+    .object({
+      login: expectedLogin
+        ? z.string().trim().min(1, "Informe o login.")
+        : z.string().optional().default(""),
+      password: z.string().min(1, "Informe a senha."),
+    })
     .safeParse(Object.fromEntries(formData));
 
   if (!parsed.success) return errorState(parsed.error);
-  if (!process.env.APP_PASSWORD || parsed.data.password !== process.env.APP_PASSWORD) {
-    return { status: "error", message: "Senha incorreta." };
+  if (
+    !process.env.APP_PASSWORD ||
+    (expectedLogin && parsed.data.login !== expectedLogin) ||
+    parsed.data.password !== process.env.APP_PASSWORD
+  ) {
+    return { status: "error", message: "Login ou senha incorretos." };
   }
 
   const cookieStore = await cookies();

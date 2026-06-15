@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import {
   ArrowUpRight,
   BookOpen,
@@ -25,6 +26,16 @@ export const dynamic = "force-dynamic";
 
 export default async function DashboardPage() {
   const workspace = await getWorkspace();
+  const needsSetup =
+    workspace.name === "Nosso concurso" ||
+    workspace.memberships.some((membership) =>
+      /^Pessoa [12]$/.test(membership.user.name),
+    );
+
+  if (needsSetup) {
+    redirect("/configuracoes?primeiro-acesso=1");
+  }
+
   const weekStart = startOfCurrentWeek();
   const today = parseLocalDate(formatDateInput());
   const sevenDaysAgo = new Date(today);
@@ -150,7 +161,7 @@ export default async function DashboardPage() {
             Visão geral
           </p>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Olá, {userNames.join(" e ")}!
+            Oi, {userNames.join(" e ")}!
           </h1>
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">
             Cada registro deixa o caminho até {workspace.name} mais claro.
