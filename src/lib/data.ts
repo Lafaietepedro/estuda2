@@ -1,11 +1,18 @@
 import { prisma } from "@/lib/prisma";
+import { requireCurrentUser } from "@/lib/auth";
 
 export async function getWorkspace() {
+  const currentUser = await requireCurrentUser();
   const exam = await prisma.exam.findFirst({
+    where: {
+      memberships: {
+        some: { userId: currentUser.id },
+      },
+    },
     orderBy: { createdAt: "asc" },
     include: {
       memberships: {
-        orderBy: { createdAt: "asc" },
+        orderBy: [{ role: "asc" }, { createdAt: "asc" }],
         include: { user: true },
       },
       subjects: {
@@ -20,5 +27,12 @@ export async function getWorkspace() {
     );
   }
 
-  return exam;
+  const currentMembership = exam.memberships.find(
+    (membership) => membership.userId === currentUser.id,
+  );
+  if (!currentMembership) {
+    throw new Error("Você não participa deste espaço de estudos.");
+  }
+
+  return { ...exam, currentUser, currentMembership };
 }

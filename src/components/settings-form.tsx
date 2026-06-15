@@ -17,10 +17,11 @@ type SettingsFormProps = {
     name: string;
     description: string;
     examDate: string;
+    weeklyGoalMinutes: number;
   };
   users: [
-    { id: string; name: string },
-    { id: string; name: string },
+    { id: string; name: string; login: string; weeklyGoalMinutes: number | null },
+    { id: string; name: string; login: string; weeklyGoalMinutes: number | null },
   ];
 };
 
@@ -33,27 +34,67 @@ export function SettingsForm({ exam, users }: SettingsFormProps) {
       <input type="hidden" name="secondUserId" value={users[1].id} />
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <label className="text-sm font-medium">
-          Primeiro integrante
-          <input
-            name="firstUserName"
-            defaultValue={users[0].name}
-            className={`${fieldClassName} mt-1.5`}
-          />
-          <FieldError errors={state.errors} name="firstUserName" />
-        </label>
-        <label className="text-sm font-medium">
-          Segundo integrante
-          <input
-            name="secondUserName"
-            defaultValue={users[1].name}
-            className={`${fieldClassName} mt-1.5`}
-          />
-          <FieldError errors={state.errors} name="secondUserName" />
-        </label>
+        {users.map((user, index) => {
+          const prefix = index === 0 ? "firstUser" : "secondUser";
+          return (
+            <fieldset key={user.id} className="space-y-4 rounded-xl border p-4">
+              <legend className="px-2 text-sm font-semibold">
+                {index === 0 ? "Responsável" : "Segundo integrante"}
+              </legend>
+              <label className="block text-sm font-medium">
+                Nome
+                <input
+                  name={`${prefix}Name`}
+                  defaultValue={user.name}
+                  className={`${fieldClassName} mt-1.5`}
+                />
+                <FieldError errors={state.errors} name={`${prefix}Name`} />
+              </label>
+              <label className="block text-sm font-medium">
+                Login
+                <input
+                  name={`${prefix}Login`}
+                  defaultValue={user.login}
+                  autoComplete="username"
+                  className={`${fieldClassName} mt-1.5`}
+                />
+                <FieldError errors={state.errors} name={`${prefix}Login`} />
+              </label>
+              <label className="block text-sm font-medium">
+                Nova senha{" "}
+                <span className="font-normal text-muted-foreground">
+                  (opcional)
+                </span>
+                <input
+                  name={`${prefix}Password`}
+                  type="password"
+                  minLength={6}
+                  autoComplete="new-password"
+                  className={`${fieldClassName} mt-1.5`}
+                />
+              </label>
+              <label className="block text-sm font-medium">
+                Meta semanal individual
+                <input
+                  name={`${prefix}WeeklyGoalMinutes`}
+                  type="number"
+                  min={1}
+                  max={10080}
+                  defaultValue={user.weeklyGoalMinutes ?? ""}
+                  placeholder="Minutos por semana"
+                  className={`${fieldClassName} mt-1.5`}
+                />
+                <FieldError
+                  errors={state.errors}
+                  name={`${prefix}WeeklyGoalMinutes`}
+                />
+              </label>
+            </fieldset>
+          );
+        })}
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-[1fr_220px]">
+      <div className="grid gap-4 sm:grid-cols-[1fr_220px_220px]">
         <label className="text-sm font-medium">
           Concurso ou objetivo
           <input
@@ -72,6 +113,18 @@ export function SettingsForm({ exam, users }: SettingsFormProps) {
             className={`${fieldClassName} mt-1.5`}
           />
           <FieldError errors={state.errors} name="examDate" />
+        </label>
+        <label className="text-sm font-medium">
+          Meta semanal da dupla
+          <input
+            name="weeklyGoalMinutes"
+            type="number"
+            min={1}
+            max={10080}
+            defaultValue={exam.weeklyGoalMinutes}
+            className={`${fieldClassName} mt-1.5`}
+          />
+          <FieldError errors={state.errors} name="weeklyGoalMinutes" />
         </label>
       </div>
 

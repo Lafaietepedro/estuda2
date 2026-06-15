@@ -1,20 +1,41 @@
 "use server";
 
-import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
+import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { createHash } from "node:crypto";
+import { ExamRole, Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { getWorkspace } from "@/lib/data";
 import { parseLocalDate } from "@/lib/dates";
 import type { FormState } from "@/lib/form-state";
+import { hashPassword, verifyPassword } from "@/lib/passwords";
 import { prisma } from "@/lib/prisma";
+import {
+  createSessionToken,
+  SESSION_COOKIE,
+  sessionCookieOptions,
+} from "@/lib/session";
 
 const idSchema = z.string().min(1, "Selecione uma opção.");
 const dateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data válida.");
+const optionalWeeklyGoalSchema = z.preprocess(
+  (value) => (value === "" || value === undefined ? null : value),
+  z.coerce
+    .number()
+    .int("Use minutos inteiros.")
+    .min(1, "Informe pelo menos 1 minuto.")
+    .max(10080, "A meta não pode superar uma semana inteira.")
+    .nullable(),
+);
+const optionalPasswordSchema = z
+  .string()
+  .refine((value) => !value || value.length >= 6, {
+    message: "Use pelo menos 6 caracteres.",
+  })
+  .optional();
 
 function errorState(error: z.ZodError): FormState {
   return {
@@ -24,24 +45,33 @@ function errorState(error: z.ZodError): FormState {
   };
 }
 
-async function validateWorkspaceSelection(userId: string, subjectId: string) {
+function revalidateRecords() {
+  revalidatePath("/");
+  revalidatePath("/sessoes");
+  revalidatePath("/questoes");
+  revalidatePath("/materias");
+  revalidatePath("/relatorios");
+  revalidatePath("/comparativo");
+}
+
+async function requireOwner() {
   const workspace = await getWorkspace();
-  const userIsMember = workspace.memberships.some(
-    (membership) => membership.userId === userId,
-  );
-  const subjectBelongsToExam = workspace.subjects.some(
-    (subject) => subject.id === subjectId,
-  );
-
-  if (!userIsMember || !subjectBelongsToExam) {
-    throw new Error("Usuário ou matéria inválidos.");
+  if (workspace.currentMembership.role !== ExamRole.OWNER) {
+    throw new Error("Apenas o responsável pode alterar esta configuração.");
   }
+  return workspace;
+}
 
+async function validateActiveSubject(subjectId: string) {
+  const workspace = await getWorkspace();
+  const subject = workspace.subjects.find(
+    (item) => item.id === subjectId && !item.archivedAt,
+  );
+  if (!subject) throw new Error("Matéria inválida ou arquivada.");
   return workspace;
 }
 
 const studySessionSchema = z.object({
-  userId: idSchema,
   subjectId: idSchema,
   studiedAt: dateSchema,
   durationMinutes: z.coerce
@@ -60,14 +90,10 @@ export async function createStudySession(
   if (!parsed.success) return errorState(parsed.error);
 
   try {
-    const workspace = await validateWorkspaceSelection(
-      parsed.data.userId,
-      parsed.data.subjectId,
-    );
-
+    const workspace = await validateActiveSubject(parsed.data.subjectId);
     await prisma.studySession.create({
       data: {
-        userId: parsed.data.userId,
+        userId: workspace.currentUser.id,
         subjectId: parsed.data.subjectId,
         examId: workspace.id,
         studiedAt: parseLocalDate(parsed.data.studiedAt),
@@ -75,12 +101,7 @@ export async function createStudySession(
         notes: parsed.data.notes || null,
       },
     });
-
-    revalidatePath("/");
-    revalidatePath("/sessoes");
-    revalidatePath("/materias");
-    revalidatePath("/relatorios");
-    revalidatePath("/comparativo");
+    revalidateRecords();
     return { status: "success", message: "Sessão registrada." };
   } catch {
     return {
@@ -90,9 +111,61 @@ export async function createStudySession(
   }
 }
 
+const updateStudySessionSchema = studySessionSchema.extend({
+  id: z.string().min(1),
+});
+
+export async function updateStudySession(
+  _previousState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const parsed = updateStudySessionSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success) return errorState(parsed.error);
+
+  try {
+    const workspace = await getWorkspace();
+    const session = await prisma.studySession.findFirst({
+      where: {
+        id: parsed.data.id,
+        examId: workspace.id,
+        userId: workspace.currentUser.id,
+      },
+    });
+    if (!session) throw new Error("Sessão não encontrada.");
+
+    const subject = workspace.subjects.find(
+      (item) => item.id === parsed.data.subjectId,
+    );
+    if (
+      !subject ||
+      (subject.archivedAt && subject.id !== session.subjectId)
+    ) {
+      throw new Error("Matéria inválida ou arquivada.");
+    }
+
+    await prisma.studySession.update({
+      where: { id: session.id },
+      data: {
+        subjectId: parsed.data.subjectId,
+        studiedAt: parseLocalDate(parsed.data.studiedAt),
+        durationMinutes: parsed.data.durationMinutes,
+        notes: parsed.data.notes || null,
+      },
+    });
+    revalidateRecords();
+    return { status: "success", message: "Sessão atualizada." };
+  } catch {
+    return {
+      status: "error",
+      message: "Você só pode editar suas próprias sessões.",
+    };
+  }
+}
+
 const questionLogSchema = z
   .object({
-    userId: idSchema,
     subjectId: idSchema,
     answeredAt: dateSchema,
     questionsAnswered: z.coerce
@@ -104,7 +177,11 @@ const questionLogSchema = z
       .number()
       .int("Use um número inteiro.")
       .min(0, "O número de acertos não pode ser negativo."),
-    notes: z.string().trim().max(500, "Use no máximo 500 caracteres.").optional(),
+    notes: z
+      .string()
+      .trim()
+      .max(500, "Use no máximo 500 caracteres.")
+      .optional(),
   })
   .refine((data) => data.correctAnswers <= data.questionsAnswered, {
     path: ["correctAnswers"],
@@ -119,14 +196,10 @@ export async function createQuestionLog(
   if (!parsed.success) return errorState(parsed.error);
 
   try {
-    const workspace = await validateWorkspaceSelection(
-      parsed.data.userId,
-      parsed.data.subjectId,
-    );
-
+    const workspace = await validateActiveSubject(parsed.data.subjectId);
     await prisma.questionLog.create({
       data: {
-        userId: parsed.data.userId,
+        userId: workspace.currentUser.id,
         subjectId: parsed.data.subjectId,
         examId: workspace.id,
         answeredAt: parseLocalDate(parsed.data.answeredAt),
@@ -135,17 +208,63 @@ export async function createQuestionLog(
         notes: parsed.data.notes || null,
       },
     });
-
-    revalidatePath("/");
-    revalidatePath("/questoes");
-    revalidatePath("/materias");
-    revalidatePath("/relatorios");
-    revalidatePath("/comparativo");
+    revalidateRecords();
     return { status: "success", message: "Questões registradas." };
   } catch {
     return {
       status: "error",
       message: "Não foi possível registrar as questões. Tente novamente.",
+    };
+  }
+}
+
+const updateQuestionLogSchema = questionLogSchema.and(
+  z.object({ id: z.string().min(1) }),
+);
+
+export async function updateQuestionLog(
+  _previousState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const parsed = updateQuestionLogSchema.safeParse(
+    Object.fromEntries(formData),
+  );
+  if (!parsed.success) return errorState(parsed.error);
+
+  try {
+    const workspace = await getWorkspace();
+    const log = await prisma.questionLog.findFirst({
+      where: {
+        id: parsed.data.id,
+        examId: workspace.id,
+        userId: workspace.currentUser.id,
+      },
+    });
+    if (!log) throw new Error("Registro não encontrado.");
+
+    const subject = workspace.subjects.find(
+      (item) => item.id === parsed.data.subjectId,
+    );
+    if (!subject || (subject.archivedAt && subject.id !== log.subjectId)) {
+      throw new Error("Matéria inválida ou arquivada.");
+    }
+
+    await prisma.questionLog.update({
+      where: { id: log.id },
+      data: {
+        subjectId: parsed.data.subjectId,
+        answeredAt: parseLocalDate(parsed.data.answeredAt),
+        questionsAnswered: parsed.data.questionsAnswered,
+        correctAnswers: parsed.data.correctAnswers,
+        notes: parsed.data.notes || null,
+      },
+    });
+    revalidateRecords();
+    return { status: "success", message: "Registro atualizado." };
+  } catch {
+    return {
+      status: "error",
+      message: "Você só pode editar seus próprios registros.",
     };
   }
 }
@@ -159,6 +278,7 @@ const subjectSchema = z.object({
   color: z
     .string()
     .regex(/^#[0-9a-fA-F]{6}$/, "Escolha uma cor válida."),
+  weeklyGoalMinutes: optionalWeeklyGoalSchema,
 });
 
 export async function createSubject(
@@ -169,27 +289,62 @@ export async function createSubject(
   if (!parsed.success) return errorState(parsed.error);
 
   try {
-    const workspace = await getWorkspace();
-    const lastSubject = workspace.subjects.at(-1);
-
+    const workspace = await requireOwner();
+    const lastPosition = Math.max(
+      0,
+      ...workspace.subjects.map((subject) => subject.position),
+    );
     await prisma.subject.create({
       data: {
         examId: workspace.id,
         name: parsed.data.name,
         color: parsed.data.color,
-        position: (lastSubject?.position ?? 0) + 1,
+        weeklyGoalMinutes: parsed.data.weeklyGoalMinutes,
+        position: lastPosition + 1,
       },
     });
-
-    revalidatePath("/");
-    revalidatePath("/materias");
-    revalidatePath("/sessoes");
-    revalidatePath("/questoes");
+    revalidateRecords();
     return { status: "success", message: "Matéria adicionada." };
   } catch {
     return {
       status: "error",
-      message: "Essa matéria já existe ou não pôde ser adicionada.",
+      message: "Essa matéria já existe ou você não pode adicioná-la.",
+    };
+  }
+}
+
+const updateSubjectSchema = subjectSchema.extend({
+  id: z.string().min(1),
+});
+
+export async function updateSubject(
+  _previousState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const parsed = updateSubjectSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return errorState(parsed.error);
+
+  try {
+    const workspace = await requireOwner();
+    const subject = workspace.subjects.find(
+      (item) => item.id === parsed.data.id,
+    );
+    if (!subject) throw new Error("Matéria não encontrada.");
+
+    await prisma.subject.update({
+      where: { id: subject.id },
+      data: {
+        name: parsed.data.name,
+        color: parsed.data.color,
+        weeklyGoalMinutes: parsed.data.weeklyGoalMinutes,
+      },
+    });
+    revalidateRecords();
+    return { status: "success", message: "Matéria atualizada." };
+  } catch {
+    return {
+      status: "error",
+      message: "Não foi possível atualizar a matéria.",
     };
   }
 }
@@ -200,25 +355,114 @@ export async function deleteStudySession(formData: FormData) {
   const parsed = deleteSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
 
-  await prisma.studySession.deleteMany({ where: { id: parsed.data.id } });
-  revalidatePath("/");
-  revalidatePath("/sessoes");
-  revalidatePath("/materias");
-  revalidatePath("/relatorios");
-  revalidatePath("/comparativo");
+  const workspace = await getWorkspace();
+  await prisma.studySession.deleteMany({
+    where: {
+      id: parsed.data.id,
+      examId: workspace.id,
+      userId: workspace.currentUser.id,
+    },
+  });
+  revalidateRecords();
 }
 
 export async function deleteQuestionLog(formData: FormData) {
   const parsed = deleteSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
 
-  await prisma.questionLog.deleteMany({ where: { id: parsed.data.id } });
-  revalidatePath("/");
-  revalidatePath("/questoes");
-  revalidatePath("/materias");
-  revalidatePath("/relatorios");
-  revalidatePath("/comparativo");
+  const workspace = await getWorkspace();
+  await prisma.questionLog.deleteMany({
+    where: {
+      id: parsed.data.id,
+      examId: workspace.id,
+      userId: workspace.currentUser.id,
+    },
+  });
+  revalidateRecords();
 }
+
+export async function toggleSubjectArchive(formData: FormData) {
+  const parsed = z
+    .object({
+      id: z.string().min(1),
+      archived: z.enum(["true", "false"]),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  const workspace = await requireOwner();
+  await prisma.subject.updateMany({
+    where: { id: parsed.data.id, examId: workspace.id },
+    data: { archivedAt: parsed.data.archived === "true" ? new Date() : null },
+  });
+  revalidateRecords();
+}
+
+export async function reorderSubject(formData: FormData) {
+  const parsed = z
+    .object({
+      id: z.string().min(1),
+      direction: z.enum(["up", "down"]),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  const workspace = await requireOwner();
+  const subject = workspace.subjects.find((item) => item.id === parsed.data.id);
+  if (!subject) return;
+
+  const ordered = workspace.subjects
+    .filter((item) => Boolean(item.archivedAt) === Boolean(subject.archivedAt))
+    .sort((first, second) => first.position - second.position);
+  const currentIndex = ordered.findIndex((item) => item.id === subject.id);
+  const targetIndex =
+    parsed.data.direction === "up" ? currentIndex - 1 : currentIndex + 1;
+  const target = ordered[targetIndex];
+  if (!target) return;
+
+  await prisma.$transaction([
+    prisma.subject.update({
+      where: { id: subject.id },
+      data: { position: target.position },
+    }),
+    prisma.subject.update({
+      where: { id: target.id },
+      data: { position: subject.position },
+    }),
+  ]);
+  revalidateRecords();
+}
+
+export async function deleteSubject(formData: FormData) {
+  const parsed = deleteSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  const workspace = await requireOwner();
+  const subject = await prisma.subject.findFirst({
+    where: { id: parsed.data.id, examId: workspace.id },
+    include: {
+      _count: { select: { studySessions: true, questionLogs: true } },
+    },
+  });
+  if (!subject) return;
+  if (subject._count.studySessions + subject._count.questionLogs > 0) {
+    throw new Error("Matérias com histórico devem ser arquivadas.");
+  }
+
+  await prisma.subject.delete({ where: { id: subject.id } });
+  revalidateRecords();
+}
+
+const loginNameSchema = z
+  .string()
+  .trim()
+  .toLowerCase()
+  .min(3, "Use pelo menos 3 caracteres.")
+  .max(40, "Use no máximo 40 caracteres.")
+  .regex(
+    /^[a-z0-9._-]+$/,
+    "Use apenas letras, números, ponto, hífen ou sublinhado.",
+  );
 
 const settingsSchema = z.object({
   examName: z
@@ -228,19 +472,36 @@ const settingsSchema = z.object({
     .max(100, "Use no máximo 100 caracteres."),
   description: z.string().trim().max(240, "Use no máximo 240 caracteres."),
   examDate: z.union([dateSchema, z.literal("")]),
+  weeklyGoalMinutes: z.coerce
+    .number()
+    .int("Use minutos inteiros.")
+    .min(1, "Informe pelo menos 1 minuto.")
+    .max(10080, "A meta não pode superar uma semana inteira."),
   firstUserId: z.string().min(1),
-  firstUserName: z
-    .string()
-    .trim()
-    .min(2, "Informe o primeiro nome.")
-    .max(60, "Use no máximo 60 caracteres."),
+  firstUserName: z.string().trim().min(2).max(60),
+  firstUserLogin: loginNameSchema,
+  firstUserPassword: optionalPasswordSchema,
+  firstUserWeeklyGoalMinutes: optionalWeeklyGoalSchema,
   secondUserId: z.string().min(1),
-  secondUserName: z
-    .string()
-    .trim()
-    .min(2, "Informe o segundo nome.")
-    .max(60, "Use no máximo 60 caracteres."),
+  secondUserName: z.string().trim().min(2).max(60),
+  secondUserLogin: loginNameSchema,
+  secondUserPassword: optionalPasswordSchema,
+  secondUserWeeklyGoalMinutes: optionalWeeklyGoalSchema,
 });
+
+function userSettingsData(
+  name: string,
+  login: string,
+  password?: string,
+): Prisma.UserUpdateInput {
+  return {
+    name,
+    login,
+    ...(password
+      ? { passwordHash: hashPassword(password) }
+      : {}),
+  };
+}
 
 export async function updateSettings(
   _previousState: FormState,
@@ -250,16 +511,16 @@ export async function updateSettings(
   if (!parsed.success) return errorState(parsed.error);
 
   try {
-    const workspace = await getWorkspace();
+    const workspace = await requireOwner();
     const validUserIds = new Set(
       workspace.memberships.map((membership) => membership.userId),
     );
-
     if (
       !validUserIds.has(parsed.data.firstUserId) ||
-      !validUserIds.has(parsed.data.secondUserId)
+      !validUserIds.has(parsed.data.secondUserId) ||
+      parsed.data.firstUserLogin === parsed.data.secondUserLogin
     ) {
-      throw new Error("Usuários inválidos.");
+      throw new Error("Usuários ou logins inválidos.");
     }
 
     await prisma.$transaction([
@@ -271,75 +532,142 @@ export async function updateSettings(
           examDate: parsed.data.examDate
             ? parseLocalDate(parsed.data.examDate)
             : null,
+          weeklyGoalMinutes: parsed.data.weeklyGoalMinutes,
         },
       }),
       prisma.user.update({
         where: { id: parsed.data.firstUserId },
-        data: { name: parsed.data.firstUserName },
+        data: userSettingsData(
+          parsed.data.firstUserName,
+          parsed.data.firstUserLogin,
+          parsed.data.firstUserPassword,
+        ),
       }),
       prisma.user.update({
         where: { id: parsed.data.secondUserId },
-        data: { name: parsed.data.secondUserName },
+        data: userSettingsData(
+          parsed.data.secondUserName,
+          parsed.data.secondUserLogin,
+          parsed.data.secondUserPassword,
+        ),
+      }),
+      prisma.examMembership.update({
+        where: {
+          userId_examId: {
+            userId: parsed.data.firstUserId,
+            examId: workspace.id,
+          },
+        },
+        data: {
+          weeklyGoalMinutes: parsed.data.firstUserWeeklyGoalMinutes,
+        },
+      }),
+      prisma.examMembership.update({
+        where: {
+          userId_examId: {
+            userId: parsed.data.secondUserId,
+            examId: workspace.id,
+          },
+        },
+        data: {
+          weeklyGoalMinutes: parsed.data.secondUserWeeklyGoalMinutes,
+        },
       }),
     ]);
-
     revalidatePath("/", "layout");
   } catch {
     return {
       status: "error",
-      message: "Não foi possível salvar as configurações.",
+      message: "Não foi possível salvar. Confira se os logins são únicos.",
     };
   }
 
   redirect("/");
 }
 
-function sessionToken() {
-  const login = process.env.APP_LOGIN ?? "";
-  const password = process.env.APP_PASSWORD ?? "";
-  const secret = process.env.AUTH_SECRET ?? "";
-  return createHash("sha256")
-    .update(`${login}:${password}:${secret}`)
-    .digest("hex");
+async function availableLogin(preferred: string, userId: string) {
+  let candidate = preferred;
+  let suffix = 2;
+  while (true) {
+    const existing = await prisma.user.findUnique({ where: { login: candidate } });
+    if (!existing || existing.id === userId) return candidate;
+    candidate = `${preferred}${suffix}`;
+    suffix += 1;
+  }
+}
+
+async function ensureLegacyCredentials() {
+  const exam = await prisma.exam.findFirst({
+    orderBy: { createdAt: "asc" },
+    include: {
+      memberships: {
+        orderBy: [{ role: "asc" }, { createdAt: "asc" }],
+        include: { user: true },
+      },
+    },
+  });
+  if (!exam) return;
+
+  const baseLogin = (process.env.APP_LOGIN || "dev").trim().toLowerCase();
+  const initialPassword = process.env.APP_PASSWORD || "dev";
+
+  for (const [index, membership] of exam.memberships.entries()) {
+    if (membership.user.login && membership.user.passwordHash) continue;
+    const preferredLogin = index === 0 ? baseLogin : `${baseLogin}${index + 1}`;
+    const loginName = membership.user.login ||
+      (await availableLogin(preferredLogin, membership.userId));
+    await prisma.user.update({
+      where: { id: membership.userId },
+      data: {
+        login: loginName,
+        passwordHash:
+          membership.user.passwordHash || hashPassword(initialPassword),
+      },
+    });
+  }
 }
 
 export async function login(
   _previousState: FormState,
   formData: FormData,
 ): Promise<FormState> {
-  const expectedLogin = process.env.APP_LOGIN;
   const parsed = z
     .object({
-      login: expectedLogin
-        ? z.string().trim().min(1, "Informe o login.")
-        : z.string().optional().default(""),
+      login: z.string().trim().toLowerCase().min(1, "Informe o login."),
       password: z.string().min(1, "Informe a senha."),
     })
     .safeParse(Object.fromEntries(formData));
-
   if (!parsed.success) return errorState(parsed.error);
+
+  await ensureLegacyCredentials();
+  const user = await prisma.user.findUnique({
+    where: { login: parsed.data.login },
+  });
   if (
-    !process.env.APP_PASSWORD ||
-    (expectedLogin && parsed.data.login !== expectedLogin) ||
-    parsed.data.password !== process.env.APP_PASSWORD
+    !user?.passwordHash ||
+    !verifyPassword(parsed.data.password, user.passwordHash)
   ) {
     return { status: "error", message: "Login ou senha incorretos." };
   }
 
-  const cookieStore = await cookies();
-  cookieStore.set("estuda2_session", sessionToken(), {
-    httpOnly: true,
-    secure: process.env.NODE_ENV === "production",
-    sameSite: "lax",
-    maxAge: 60 * 60 * 24 * 30,
-    path: "/",
+  const membership = await prisma.examMembership.findFirst({
+    where: { userId: user.id },
   });
+  if (!membership) {
+    return { status: "error", message: "Usuário sem espaço de estudos." };
+  }
 
+  const cookieStore = await cookies();
+  cookieStore.set(
+    SESSION_COOKIE,
+    await createSessionToken(user.id),
+    sessionCookieOptions,
+  );
   redirect("/");
 }
 
 export async function logout() {
   const cookieStore = await cookies();
-  cookieStore.delete("estuda2_session");
+  cookieStore.delete(SESSION_COOKIE);
   redirect("/entrar");
 }

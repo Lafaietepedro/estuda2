@@ -12,6 +12,10 @@ export async function AppShell({ children }: AppShellProps) {
   const workspace = await getWorkspace();
   const navigationContext = {
     examName: workspace.name,
+    currentUser: {
+      name: workspace.currentUser.name,
+      role: workspace.currentMembership.role,
+    },
     users: workspace.memberships.map((membership) => ({
       id: membership.user.id,
       name: membership.user.name,

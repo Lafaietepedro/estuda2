@@ -38,12 +38,14 @@ const navigationItems: NavigationItem[] = [
 
 type SidebarNavigationProps = {
   examName: string;
+  currentUser: { name: string; role: "OWNER" | "MEMBER" };
   users: { id: string; name: string }[];
   onNavigate?: () => void;
 };
 
 export function SidebarNavigation({
   examName,
+  currentUser,
   users,
   onNavigate,
 }: SidebarNavigationProps) {
@@ -119,20 +121,16 @@ export function SidebarNavigation({
 
       <div className="border-t border-sidebar-border p-4">
         <div className="flex items-center gap-3 rounded-xl bg-sidebar-accent/70 p-3">
-          <div className="flex -space-x-2">
-            <span className="flex size-9 items-center justify-center rounded-full border-2 border-sidebar bg-violet-100 text-xs font-bold text-violet-700">
-              {initials(firstUser)}
-            </span>
-            <span className="flex size-9 items-center justify-center rounded-full border-2 border-sidebar bg-emerald-100 text-xs font-bold text-emerald-700">
-              {initials(secondUser)}
-            </span>
-          </div>
+          <span className="flex size-9 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
+            {initials(currentUser.name)}
+          </span>
           <div className="min-w-0">
             <p className="truncate text-sm font-semibold text-foreground">
-              {firstUser} & {secondUser}
+              {currentUser.name}
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              Dupla de estudos
+              {currentUser.role === "OWNER" ? "Responsável" : "Integrante"} ·{" "}
+              {firstUser} & {secondUser}
             </p>
           </div>
         </div>

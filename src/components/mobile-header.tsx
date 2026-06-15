@@ -16,10 +16,15 @@ import {
 
 type MobileHeaderProps = {
   examName: string;
+  currentUser: { name: string; role: "OWNER" | "MEMBER" };
   users: { id: string; name: string }[];
 };
 
-export function MobileHeader({ examName, users }: MobileHeaderProps) {
+export function MobileHeader({
+  examName,
+  currentUser,
+  users,
+}: MobileHeaderProps) {
   const [open, setOpen] = useState(false);
 
   return (
@@ -42,6 +47,7 @@ export function MobileHeader({ examName, users }: MobileHeaderProps) {
           </SheetDescription>
           <SidebarNavigation
             examName={examName}
+            currentUser={currentUser}
             users={users}
             onNavigate={() => setOpen(false)}
           />

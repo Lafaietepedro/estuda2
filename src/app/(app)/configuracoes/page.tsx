@@ -23,10 +23,29 @@ export default async function SettingsPage({
   const users = workspace.memberships.map((membership) => ({
     id: membership.user.id,
     name: membership.user.name,
+    login: membership.user.login ?? "",
+    weeklyGoalMinutes: membership.weeklyGoalMinutes,
   }));
 
   if (users.length < 2) {
     throw new Error("O espaço precisa ter dois integrantes.");
+  }
+
+  if (workspace.currentMembership.role !== "OWNER") {
+    return (
+      <div className="space-y-7">
+        <PageHeading
+          eyebrow="Personalização"
+          title="Configurações"
+          description="As configurações compartilhadas são administradas pelo responsável do espaço."
+        />
+        <div className="rounded-2xl border bg-card p-5 text-sm text-muted-foreground shadow-sm">
+          Sua conta pode registrar, editar e excluir os próprios lançamentos.
+          Peça ao responsável para alterar concurso, usuários, credenciais ou
+          metas.
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -58,6 +77,7 @@ export default async function SettingsPage({
             examDate: workspace.examDate
               ? formatDateInput(workspace.examDate)
               : "",
+            weeklyGoalMinutes: workspace.weeklyGoalMinutes,
           }}
           users={[
             users[0],

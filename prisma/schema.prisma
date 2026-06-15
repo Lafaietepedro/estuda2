@@ -16,6 +16,8 @@ model User {
   id            String           @id @default(cuid())
   name          String
   email         String           @unique
+  login         String?          @unique
+  passwordHash  String?
   createdAt     DateTime         @default(now())
   updatedAt     DateTime         @updatedAt
   memberships   ExamMembership[]
@@ -24,43 +26,47 @@ model User {
 }
 
 model Exam {
-  id            String           @id @default(cuid())
-  name          String
-  slug          String           @unique
-  description   String?
-  examDate      DateTime?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  memberships   ExamMembership[]
-  subjects      Subject[]
-  studySessions StudySession[]
-  questionLogs  QuestionLog[]
+  id                String           @id @default(cuid())
+  name              String
+  slug              String           @unique
+  description       String?
+  examDate          DateTime?
+  weeklyGoalMinutes Int              @default(300)
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  memberships       ExamMembership[]
+  subjects          Subject[]
+  studySessions     StudySession[]
+  questionLogs      QuestionLog[]
 }
 
 model ExamMembership {
-  id        String   @id @default(cuid())
-  role      ExamRole @default(MEMBER)
-  userId    String
-  examId    String
-  createdAt DateTime @default(now())
-  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  exam      Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
+  id                String   @id @default(cuid())
+  role              ExamRole @default(MEMBER)
+  weeklyGoalMinutes Int?
+  userId            String
+  examId            String
+  createdAt         DateTime @default(now())
+  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam              Exam     @relation(fields: [examId], references: [id], onDelete: Cascade)
 
   @@unique([userId, examId])
   @@index([examId])
 }
 
 model Subject {
-  id            String         @id @default(cuid())
-  name          String
-  color         String
-  position      Int            @default(0)
-  examId        String
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
-  exam          Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
-  studySessions StudySession[]
-  questionLogs  QuestionLog[]
+  id                String         @id @default(cuid())
+  name              String
+  color             String
+  position          Int            @default(0)
+  weeklyGoalMinutes Int?
+  archivedAt        DateTime?
+  examId            String
+  createdAt         DateTime       @default(now())
+  updatedAt         DateTime       @updatedAt
+  exam              Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  studySessions     StudySession[]
+  questionLogs      QuestionLog[]
 
   @@unique([examId, name])
   @@index([examId])

@@ -1,23 +1,11 @@
 import { NextResponse, type NextRequest } from "next/server";
 
-async function expectedSessionToken() {
-  const login = process.env.APP_LOGIN ?? "";
-  const password = process.env.APP_PASSWORD ?? "";
-  const secret = process.env.AUTH_SECRET ?? "";
-  const data = new TextEncoder().encode(`${login}:${password}:${secret}`);
-  const digest = await crypto.subtle.digest("SHA-256", data);
-
-  return Array.from(new Uint8Array(digest))
-    .map((byte) => byte.toString(16).padStart(2, "0"))
-    .join("");
-}
+import { SESSION_COOKIE, verifySessionToken } from "@/lib/session";
 
 export async function middleware(request: NextRequest) {
-  if (!process.env.APP_PASSWORD) return NextResponse.next();
-
   const isLoginPage = request.nextUrl.pathname === "/entrar";
-  const token = request.cookies.get("estuda2_session")?.value;
-  const isAuthenticated = token === (await expectedSessionToken());
+  const token = request.cookies.get(SESSION_COOKIE)?.value;
+  const isAuthenticated = Boolean(await verifySessionToken(token));
 
   if (!isAuthenticated && !isLoginPage) {
     return NextResponse.redirect(new URL("/entrar", request.url));

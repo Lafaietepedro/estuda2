@@ -1,6 +1,10 @@
 import { ExamRole, PrismaClient } from "@prisma/client";
 
+import { hashPassword } from "../src/lib/passwords";
+
 const prisma = new PrismaClient();
+const firstLogin = (process.env.APP_LOGIN || "dev").trim().toLowerCase();
+const initialPassword = process.env.APP_PASSWORD || "dev";
 
 const subjects = [
   { name: "Língua Portuguesa", color: "#7C3AED", position: 1 },
@@ -19,6 +23,8 @@ async function main() {
       create: {
         name: "Pessoa 1",
         email: "pessoa1@estuda2.local",
+        login: firstLogin,
+        passwordHash: hashPassword(initialPassword),
       },
     }),
     prisma.user.upsert({
@@ -27,6 +33,8 @@ async function main() {
       create: {
         name: "Pessoa 2",
         email: "pessoa2@estuda2.local",
+        login: `${firstLogin}2`,
+        passwordHash: hashPassword(initialPassword),
       },
     }),
   ]);

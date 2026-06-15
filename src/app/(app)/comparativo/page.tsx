@@ -1,6 +1,6 @@
 import { PageHeading } from "@/components/page-heading";
 import { getWorkspace } from "@/lib/data";
-import { minutesToLabel } from "@/lib/dates";
+import { minutesToLabel, startOfCurrentWeek } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 
 export const metadata = {
@@ -11,12 +11,18 @@ export const dynamic = "force-dynamic";
 
 export default async function ComparisonPage() {
   const workspace = await getWorkspace();
-  const [sessionTotals, questionTotals] = await Promise.all([
+  const weekStart = startOfCurrentWeek();
+  const [sessionTotals, weeklySessionTotals, questionTotals] = await Promise.all([
     prisma.studySession.groupBy({
       by: ["userId"],
       where: { examId: workspace.id },
       _sum: { durationMinutes: true },
       _count: true,
+    }),
+    prisma.studySession.groupBy({
+      by: ["userId"],
+      where: { examId: workspace.id, studiedAt: { gte: weekStart } },
+      _sum: { durationMinutes: true },
     }),
     prisma.questionLog.groupBy({
       by: ["userId"],
@@ -30,6 +36,12 @@ export default async function ComparisonPage() {
   const questionsByUser = new Map(
     questionTotals.map((item) => [item.userId, item]),
   );
+  const weeklySessionsByUser = new Map(
+    weeklySessionTotals.map((item) => [
+      item.userId,
+      item._sum.durationMinutes ?? 0,
+    ]),
+  );
   const members = workspace.memberships.map((membership) => {
     const sessions = sessionsByUser.get(membership.userId);
     const questions = questionsByUser.get(membership.userId);
@@ -40,6 +52,8 @@ export default async function ComparisonPage() {
       name: membership.user.name,
       minutes: sessions?._sum.durationMinutes ?? 0,
       sessions: sessions?._count ?? 0,
+      weeklyMinutes: weeklySessionsByUser.get(membership.userId) ?? 0,
+      weeklyGoalMinutes: membership.weeklyGoalMinutes,
       answered,
       accuracy: answered ? Math.round((correct / answered) * 100) : 0,
     };
@@ -97,6 +111,28 @@ export default async function ComparisonPage() {
             </dl>
 
             <div className="mt-7 space-y-4">
+              {member.weeklyGoalMinutes && (
+                <div>
+                  <div className="mb-1.5 flex justify-between text-xs">
+                    <span>Meta desta semana</span>
+                    <span>
+                      {minutesToLabel(member.weeklyMinutes)} /{" "}
+                      {minutesToLabel(member.weeklyGoalMinutes)}
+                    </span>
+                  </div>
+                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                    <div
+                      className="h-full rounded-full bg-violet-500"
+                      style={{
+                        width: `${Math.min(
+                          100,
+                          (member.weeklyMinutes / member.weeklyGoalMinutes) * 100,
+                        )}%`,
+                      }}
+                    />
+                  </div>
+                </div>
+              )}
               <div>
                 <div className="mb-1.5 flex justify-between text-xs">
                   <span>Tempo estudado</span>

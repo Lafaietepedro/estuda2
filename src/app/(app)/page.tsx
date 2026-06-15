@@ -143,15 +143,15 @@ export default async function DashboardPage() {
     },
     {
       label: "Matérias ativas",
-      value: String(workspace.subjects.length),
+      value: String(
+        workspace.subjects.filter((subject) => !subject.archivedAt).length,
+      ),
       helper: "No plano atual",
       icon: BookOpen,
       accent: "bg-sky-100 text-sky-700",
     },
   ];
-  const userNames = workspace.memberships.map(
-    (membership) => membership.user.name,
-  );
+  const weeklyGoalMinutes = workspace.weeklyGoalMinutes;
 
   return (
     <div className="space-y-7">
@@ -161,7 +161,7 @@ export default async function DashboardPage() {
             Visão geral
           </p>
           <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Oi, {userNames.join(" e ")}!
+            Oi, {workspace.currentUser.name}!
           </h1>
           <p className="mt-2 text-sm text-muted-foreground sm:text-base">
             Cada registro deixa o caminho até {workspace.name} mais claro.
@@ -257,18 +257,25 @@ export default async function DashboardPage() {
             <Target className="size-5 text-violet-300" aria-hidden="true" />
           </div>
           <p className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-violet-300">
-            Meta semanal inicial
+            Meta semanal da dupla
           </p>
-          <h2 className="mt-2 text-xl font-semibold">5 horas em dupla</h2>
+          <h2 className="mt-2 text-xl font-semibold">
+            {minutesToLabel(weeklyGoalMinutes)} em dupla
+          </h2>
           <p className="mt-3 text-sm leading-6 text-slate-300">
             Vocês já registraram {minutesToLabel(weekMinutes)}. Faltam{" "}
-            {minutesToLabel(Math.max(0, 300 - weekMinutes))} para a primeira
-            meta.
+            {minutesToLabel(Math.max(0, weeklyGoalMinutes - weekMinutes))} para
+            a meta.
           </p>
           <div className="mt-6 h-2 overflow-hidden rounded-full bg-white/10">
             <div
               className="h-full rounded-full bg-violet-400"
-              style={{ width: `${Math.min(100, (weekMinutes / 300) * 100)}%` }}
+              style={{
+                width: `${Math.min(
+                  100,
+                  (weekMinutes / weeklyGoalMinutes) * 100,
+                )}%`,
+              }}
             />
           </div>
           <Link

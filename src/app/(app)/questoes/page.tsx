@@ -1,8 +1,11 @@
-import { Trash2 } from "lucide-react";
+import { Pencil, Trash2 } from "lucide-react";
 
 import { deleteQuestionLog } from "@/app/actions";
 import { PageHeading } from "@/components/page-heading";
-import { QuestionLogForm } from "@/components/record-forms";
+import {
+  QuestionLogEditForm,
+  QuestionLogForm,
+} from "@/components/record-forms";
 import { Button } from "@/components/ui/button";
 import { getWorkspace } from "@/lib/data";
 import { formatDate, formatDateInput } from "@/lib/dates";
@@ -22,7 +25,9 @@ export default async function QuestionsPage() {
     take: 100,
     include: { user: true, subject: true },
   });
-  const users = workspace.memberships.map((membership) => membership.user);
+  const activeSubjects = workspace.subjects.filter(
+    (subject) => !subject.archivedAt,
+  );
 
   return (
     <div className="space-y-7">
@@ -35,12 +40,12 @@ export default async function QuestionsPage() {
       <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
         <h2 className="text-lg font-semibold">Novo registro</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Informe o total resolvido e quantas vocês acertaram.
+          O registro será vinculado automaticamente a{" "}
+          <strong>{workspace.currentUser.name}</strong>.
         </p>
         <div className="mt-5">
           <QuestionLogForm
-            users={users}
-            subjects={workspace.subjects}
+            subjects={activeSubjects}
             defaultDate={formatDateInput()}
           />
         </div>
@@ -68,7 +73,7 @@ export default async function QuestionsPage() {
               return (
                 <article
                   key={log.id}
-                  className="flex flex-col gap-4 rounded-2xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
+                  className="relative flex flex-col gap-4 rounded-2xl border bg-card p-4 shadow-sm sm:flex-row sm:items-center sm:justify-between"
                 >
                   <div className="flex items-start gap-3">
                     <span
@@ -95,18 +100,45 @@ export default async function QuestionsPage() {
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
                       {accuracy}%
                     </span>
-                    <form action={deleteQuestionLog}>
-                      <input type="hidden" name="id" value={log.id} />
-                      <Button
-                        type="submit"
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Excluir registro"
-                        className="text-muted-foreground hover:text-destructive"
-                      >
-                        <Trash2 aria-hidden="true" />
-                      </Button>
-                    </form>
+                    {log.userId === workspace.currentUser.id && (
+                      <>
+                        <details className="group">
+                          <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
+                            <Pencil className="size-4" aria-hidden="true" />
+                            <span className="sr-only">Editar registro</span>
+                          </summary>
+                          <div className="mt-3 rounded-xl border bg-muted/30 p-4 sm:absolute sm:right-10 sm:z-20 sm:w-[32rem] sm:bg-card sm:shadow-xl">
+                            <QuestionLogEditForm
+                              log={{
+                                id: log.id,
+                                subjectId: log.subjectId,
+                                answeredAt: formatDateInput(log.answeredAt),
+                                questionsAnswered: log.questionsAnswered,
+                                correctAnswers: log.correctAnswers,
+                                notes: log.notes ?? "",
+                              }}
+                              subjects={workspace.subjects.filter(
+                                (subject) =>
+                                  !subject.archivedAt ||
+                                  subject.id === log.subjectId,
+                              )}
+                            />
+                          </div>
+                        </details>
+                        <form action={deleteQuestionLog}>
+                          <input type="hidden" name="id" value={log.id} />
+                          <Button
+                            type="submit"
+                            variant="ghost"
+                            size="icon"
+                            aria-label="Excluir registro"
+                            className="text-muted-foreground hover:text-destructive"
+                          >
+                            <Trash2 aria-hidden="true" />
+                          </Button>
+                        </form>
+                      </>
+                    )}
                   </div>
                 </article>
               );

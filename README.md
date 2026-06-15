@@ -44,9 +44,11 @@ Aplicacao full stack para acompanhar estudos de concurso em dupla.
 
 Acesse [http://localhost:3000](http://localhost:3000).
 
-Quando `APP_PASSWORD` estiver definida, o app exige autenticação. `APP_LOGIN`
-é opcional; quando definido, login e senha são obrigatórios. Use em produção
-valores fortes e um `AUTH_SECRET` diferente.
+O seed cria duas contas individuais. Em desenvolvimento, use `dev` e `dev2`
+com a senha `dev`. `APP_LOGIN` e `APP_PASSWORD` definem as credenciais iniciais
+do responsável em ambientes existentes; a segunda conta recebe o sufixo `2`.
+Depois, o responsável pode alterar os dois logins e senhas nas configurações.
+Use em produção valores fortes e um `AUTH_SECRET` diferente.
 
 ## Scripts
 
