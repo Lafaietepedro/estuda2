@@ -12,17 +12,23 @@ enum ExamRole {
   MEMBER
 }
 
+enum PlanItemKind {
+  STUDY
+  REVIEW
+}
+
 model User {
-  id            String           @id @default(cuid())
-  name          String
-  email         String           @unique
-  login         String?          @unique
-  passwordHash  String?
-  createdAt     DateTime         @default(now())
-  updatedAt     DateTime         @updatedAt
-  memberships   ExamMembership[]
-  studySessions StudySession[]
-  questionLogs  QuestionLog[]
+  id             String           @id @default(cuid())
+  name           String
+  email          String           @unique
+  login          String?          @unique
+  passwordHash   String?
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+  memberships    ExamMembership[]
+  studySessions  StudySession[]
+  questionLogs   QuestionLog[]
+  studyPlanItems StudyPlanItem[]
 }
 
 model Exam {
@@ -38,6 +44,7 @@ model Exam {
   subjects          Subject[]
   studySessions     StudySession[]
   questionLogs      QuestionLog[]
+  studyPlanItems    StudyPlanItem[]
 }
 
 model ExamMembership {
@@ -55,18 +62,19 @@ model ExamMembership {
 }
 
 model Subject {
-  id                String         @id @default(cuid())
+  id                String          @id @default(cuid())
   name              String
   color             String
-  position          Int            @default(0)
+  position          Int             @default(0)
   weeklyGoalMinutes Int?
   archivedAt        DateTime?
   examId            String
-  createdAt         DateTime       @default(now())
-  updatedAt         DateTime       @updatedAt
-  exam              Exam           @relation(fields: [examId], references: [id], onDelete: Cascade)
+  createdAt         DateTime        @default(now())
+  updatedAt         DateTime        @updatedAt
+  exam              Exam            @relation(fields: [examId], references: [id], onDelete: Cascade)
   studySessions     StudySession[]
   questionLogs      QuestionLog[]
+  studyPlanItems    StudyPlanItem[]
 
   @@unique([examId, name])
   @@index([examId])
@@ -108,5 +116,27 @@ model QuestionLog {
 
   @@index([userId, answeredAt])
   @@index([examId, answeredAt])
+  @@index([subjectId])
+}
+
+model StudyPlanItem {
+  id               String       @id @default(cuid())
+  kind             PlanItemKind @default(STUDY)
+  title            String
+  scheduledFor     DateTime
+  estimatedMinutes Int
+  notes            String?
+  completedAt      DateTime?
+  userId           String
+  examId           String
+  subjectId        String
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam             Exam         @relation(fields: [examId], references: [id], onDelete: Cascade)
+  subject          Subject      @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+
+  @@index([userId, scheduledFor])
+  @@index([examId, scheduledFor])
   @@index([subjectId])
 }

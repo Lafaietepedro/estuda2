@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import {
   ArrowUpRight,
   BookOpen,
+  CalendarCheck2,
   CalendarDays,
   CircleCheck,
   Clock3,
@@ -43,8 +44,13 @@ export default async function DashboardPage() {
   const sevenDaysAgo = new Date(today);
   sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 6);
 
-  const [weekSessions, weekQuestions, recentSessions, recentQuestions] =
-    await Promise.all([
+  const [
+    weekSessions,
+    weekQuestions,
+    recentSessions,
+    recentQuestions,
+    nextPlanItems,
+  ] = await Promise.all([
       prisma.studySession.findMany({
         where: { examId: workspace.id, studiedAt: { gte: sevenDaysAgo } },
         select: { durationMinutes: true, studiedAt: true, userId: true },
@@ -68,6 +74,16 @@ export default async function DashboardPage() {
         orderBy: [{ answeredAt: "desc" }, { createdAt: "desc" }],
         take: 4,
         include: { user: true, subject: true },
+      }),
+      prisma.studyPlanItem.findMany({
+        where: {
+          examId: workspace.id,
+          userId: workspace.currentUser.id,
+          completedAt: null,
+        },
+        orderBy: [{ scheduledFor: "asc" }, { createdAt: "asc" }],
+        take: 4,
+        include: { subject: true },
       }),
     ]);
 
@@ -371,6 +387,65 @@ export default async function DashboardPage() {
             <ArrowUpRight className="size-4" aria-hidden="true" />
           </Link>
         </article>
+      </section>
+
+      <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="font-semibold">Meu próximo passo</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Estudos e revisões da sua agenda
+            </p>
+          </div>
+          <Link
+            href="/planejamento"
+            className={cn(buttonVariants({ variant: "outline", size: "sm" }))}
+          >
+            <CalendarCheck2 aria-hidden="true" />
+            Planejar
+          </Link>
+        </div>
+
+        {nextPlanItems.length === 0 ? (
+          <p className="mt-5 rounded-xl border border-dashed px-4 py-8 text-center text-sm text-muted-foreground">
+            Sua agenda está livre. Programe o próximo estudo ou revisão.
+          </p>
+        ) : (
+          <div className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {nextPlanItems.map((item) => {
+              const isOverdue = item.scheduledFor < today;
+              return (
+                <article
+                  key={item.id}
+                  className="rounded-xl border bg-muted/25 p-4"
+                >
+                  <div className="flex items-center gap-2">
+                    <span
+                      className="size-2.5 rounded-full"
+                      style={{ backgroundColor: item.subject.color }}
+                    />
+                    <span className="truncate text-xs font-medium text-muted-foreground">
+                      {item.subject.name}
+                    </span>
+                  </div>
+                  <p className="mt-3 line-clamp-2 text-sm font-semibold">
+                    {item.title}
+                  </p>
+                  <p
+                    className={cn(
+                      "mt-2 text-xs text-muted-foreground",
+                      isOverdue && "font-semibold text-red-600",
+                    )}
+                  >
+                    {isOverdue ? "Atrasada · " : ""}
+                    {formatDate(item.scheduledFor)} ·{" "}
+                    {minutesToLabel(item.estimatedMinutes)}
+                  </p>
+                </article>
+              );
+            })}
+          </div>
+        )}
       </section>
 
       <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">

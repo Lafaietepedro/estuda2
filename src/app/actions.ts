@@ -3,7 +3,7 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { ExamRole, Prisma } from "@prisma/client";
+import { ExamRole, PlanItemKind, Prisma } from "@prisma/client";
 import { z } from "zod";
 
 import { getWorkspace } from "@/lib/data";
@@ -52,6 +52,7 @@ function revalidateRecords() {
   revalidatePath("/materias");
   revalidatePath("/relatorios");
   revalidatePath("/comparativo");
+  revalidatePath("/planejamento");
 }
 
 async function requireOwner() {
@@ -267,6 +268,148 @@ export async function updateQuestionLog(
       message: "Você só pode editar seus próprios registros.",
     };
   }
+}
+
+const planItemSchema = z.object({
+  kind: z.nativeEnum(PlanItemKind),
+  subjectId: idSchema,
+  scheduledFor: dateSchema,
+  title: z
+    .string()
+    .trim()
+    .min(2, "Informe o objetivo da atividade.")
+    .max(120, "Use no máximo 120 caracteres."),
+  estimatedMinutes: z.coerce
+    .number()
+    .int("Use minutos inteiros.")
+    .min(5, "Planeje pelo menos 5 minutos.")
+    .max(1440, "A duração máxima é de 24 horas."),
+  notes: z.string().trim().max(500, "Use no máximo 500 caracteres.").optional(),
+});
+
+export async function createPlanItem(
+  _previousState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const parsed = planItemSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return errorState(parsed.error);
+
+  try {
+    const workspace = await validateActiveSubject(parsed.data.subjectId);
+    await prisma.studyPlanItem.create({
+      data: {
+        kind: parsed.data.kind,
+        title: parsed.data.title,
+        scheduledFor: parseLocalDate(parsed.data.scheduledFor),
+        estimatedMinutes: parsed.data.estimatedMinutes,
+        notes: parsed.data.notes || null,
+        userId: workspace.currentUser.id,
+        examId: workspace.id,
+        subjectId: parsed.data.subjectId,
+      },
+    });
+    revalidateRecords();
+    return {
+      status: "success",
+      message:
+        parsed.data.kind === PlanItemKind.REVIEW
+          ? "Revisão programada."
+          : "Estudo programado.",
+    };
+  } catch {
+    return {
+      status: "error",
+      message: "Não foi possível programar a atividade.",
+    };
+  }
+}
+
+const updatePlanItemSchema = planItemSchema.extend({
+  id: z.string().min(1),
+});
+
+export async function updatePlanItem(
+  _previousState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const parsed = updatePlanItemSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return errorState(parsed.error);
+
+  try {
+    const workspace = await getWorkspace();
+    const item = await prisma.studyPlanItem.findFirst({
+      where: {
+        id: parsed.data.id,
+        examId: workspace.id,
+        userId: workspace.currentUser.id,
+      },
+    });
+    if (!item) throw new Error("Atividade não encontrada.");
+
+    const subject = workspace.subjects.find(
+      (candidate) => candidate.id === parsed.data.subjectId,
+    );
+    if (!subject || (subject.archivedAt && subject.id !== item.subjectId)) {
+      throw new Error("Matéria inválida ou arquivada.");
+    }
+
+    await prisma.studyPlanItem.update({
+      where: { id: item.id },
+      data: {
+        kind: parsed.data.kind,
+        title: parsed.data.title,
+        scheduledFor: parseLocalDate(parsed.data.scheduledFor),
+        estimatedMinutes: parsed.data.estimatedMinutes,
+        notes: parsed.data.notes || null,
+        subjectId: parsed.data.subjectId,
+      },
+    });
+    revalidateRecords();
+    return { status: "success", message: "Planejamento atualizado." };
+  } catch {
+    return {
+      status: "error",
+      message: "Você só pode editar suas próprias atividades.",
+    };
+  }
+}
+
+export async function togglePlanItemCompletion(formData: FormData) {
+  const parsed = z
+    .object({
+      id: z.string().min(1),
+      completed: z.enum(["true", "false"]),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  const workspace = await getWorkspace();
+  await prisma.studyPlanItem.updateMany({
+    where: {
+      id: parsed.data.id,
+      examId: workspace.id,
+      userId: workspace.currentUser.id,
+    },
+    data: {
+      completedAt: parsed.data.completed === "true" ? new Date() : null,
+    },
+  });
+  revalidateRecords();
+}
+
+export async function deletePlanItem(formData: FormData) {
+  const parsed = deleteSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  const workspace = await getWorkspace();
+  await prisma.studyPlanItem.deleteMany({
+    where: {
+      id: parsed.data.id,
+      examId: workspace.id,
+      userId: workspace.currentUser.id,
+    },
+  });
+  revalidateRecords();
 }
 
 const subjectSchema = z.object({

@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   BookOpen,
+  CalendarCheck2,
   CircleHelp,
   ClipboardList,
   LayoutDashboard,
@@ -29,6 +30,7 @@ type NavigationItem = {
 const navigationItems: NavigationItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Matérias", href: "/materias", icon: BookOpen },
+  { label: "Planejamento", href: "/planejamento", icon: CalendarCheck2 },
   { label: "Sessões", href: "/sessoes", icon: TimerReset },
   { label: "Questões", href: "/questoes", icon: CircleHelp },
   { label: "Relatórios", href: "/relatorios", icon: BarChart3 },
