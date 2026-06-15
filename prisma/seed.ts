@@ -4,6 +4,7 @@ import { hashPassword } from "../src/lib/passwords";
 
 const prisma = new PrismaClient();
 const firstLogin = (process.env.APP_LOGIN || "dev").trim().toLowerCase();
+const secondLogin = firstLogin === "dev" ? "dev2" : `${firstLogin}-2`;
 const initialPassword = process.env.APP_PASSWORD || "dev";
 
 const subjects = [
@@ -33,7 +34,7 @@ async function main() {
       create: {
         name: "Pessoa 2",
         email: "pessoa2@estuda2.local",
-        login: `${firstLogin}2`,
+        login: secondLogin,
         passwordHash: hashPassword(initialPassword),
       },
     }),

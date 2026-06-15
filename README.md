@@ -46,7 +46,7 @@ Acesse [http://localhost:3000](http://localhost:3000).
 
 O seed cria duas contas individuais. Em desenvolvimento, use `dev` e `dev2`
 com a senha `dev`. `APP_LOGIN` e `APP_PASSWORD` definem as credenciais iniciais
-do responsável em ambientes existentes; a segunda conta recebe o sufixo `2`.
+do responsável em ambientes existentes; a segunda conta recebe o sufixo `-2`.
 Depois, o responsável pode alterar os dois logins e senhas nas configurações.
 Use em produção valores fortes e um `AUTH_SECRET` diferente.
 

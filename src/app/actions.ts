@@ -613,7 +613,12 @@ async function ensureLegacyCredentials() {
 
   for (const [index, membership] of exam.memberships.entries()) {
     if (membership.user.login && membership.user.passwordHash) continue;
-    const preferredLogin = index === 0 ? baseLogin : `${baseLogin}${index + 1}`;
+    const preferredLogin =
+      index === 0
+        ? baseLogin
+        : baseLogin === "dev"
+          ? `dev${index + 1}`
+          : `${baseLogin}-${index + 1}`;
     const loginName = membership.user.login ||
       (await availableLogin(preferredLogin, membership.userId));
     await prisma.user.update({
