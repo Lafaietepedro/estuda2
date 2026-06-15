@@ -1,6 +1,8 @@
 import { Pencil, Trash2 } from "lucide-react";
+import type { Prisma } from "@prisma/client";
 
 import { deleteStudySession } from "@/app/actions";
+import { DataFilters } from "@/components/data-filters";
 import { PageHeading } from "@/components/page-heading";
 import {
   StudySessionEditForm,
@@ -8,6 +10,12 @@ import {
 } from "@/components/record-forms";
 import { ConfirmSubmitButton } from "@/components/form-controls";
 import { getWorkspace } from "@/lib/data";
+import {
+  parsePeriod,
+  parseScope,
+  periodLabel,
+  periodStart,
+} from "@/lib/data-filters";
 import { formatDate, formatDateInput, minutesToLabel } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 
@@ -17,14 +25,42 @@ export const metadata = {
 
 export const dynamic = "force-dynamic";
 
-export default async function SessionsPage() {
+type SessionsPageProps = {
+  searchParams: Promise<{
+    period?: string;
+    scope?: string;
+    subject?: string;
+  }>;
+};
+
+export default async function SessionsPage({
+  searchParams,
+}: SessionsPageProps) {
+  const query = await searchParams;
   const workspace = await getWorkspace();
-  const sessions = await prisma.studySession.findMany({
-    where: { examId: workspace.id },
-    orderBy: [{ studiedAt: "desc" }, { createdAt: "desc" }],
-    take: 100,
-    include: { user: true, subject: true },
-  });
+  const period = parsePeriod(query.period, "all");
+  const scope = parseScope(query.scope);
+  const start = periodStart(period);
+  const subjectId = workspace.subjects.some(
+    (subject) => subject.id === query.subject,
+  )
+    ? query.subject
+    : undefined;
+  const where = {
+    examId: workspace.id,
+    ...(scope === "mine" ? { userId: workspace.currentUser.id } : {}),
+    ...(subjectId ? { subjectId } : {}),
+    ...(start ? { studiedAt: { gte: start } } : {}),
+  } satisfies Prisma.StudySessionWhereInput;
+  const [sessions, totalSessions] = await Promise.all([
+    prisma.studySession.findMany({
+      where,
+      orderBy: [{ studiedAt: "desc" }, { createdAt: "desc" }],
+      take: 100,
+      include: { user: true, subject: true },
+    }),
+    prisma.studySession.count({ where }),
+  ]);
   const activeSubjects = workspace.subjects.filter(
     (subject) => !subject.archivedAt,
   );
@@ -51,11 +87,26 @@ export default async function SessionsPage() {
         </div>
       </section>
 
+      <DataFilters
+        basePath="/sessoes"
+        period={period}
+        scope={scope}
+        subjectId={subjectId}
+        subjects={workspace.subjects}
+        exportTypes={[{ type: "sessoes", label: "Exportar sessões" }]}
+      />
+
       <section>
         <div className="mb-4 flex items-center justify-between">
-          <h2 className="text-lg font-semibold">Histórico</h2>
+          <div>
+            <h2 className="text-lg font-semibold">Histórico</h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              {periodLabel(period)}
+            </p>
+          </div>
           <span className="text-sm text-muted-foreground">
-            {sessions.length} {sessions.length === 1 ? "registro" : "registros"}
+            {totalSessions > 100 ? "100 de " : ""}
+            {totalSessions} {totalSessions === 1 ? "registro" : "registros"}
           </span>
         </div>
 
