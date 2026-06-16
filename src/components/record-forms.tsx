@@ -18,6 +18,7 @@ import {
   textareaClassName,
 } from "@/components/form-controls";
 import { initialFormState } from "@/lib/form-state";
+import { topicOptionLabel, type TopicOption } from "@/lib/topics";
 
 type Option = {
   id: string;
@@ -26,11 +27,45 @@ type Option = {
 
 type RecordFormProps = {
   subjects: Option[];
+  topics: TopicOption[];
   defaultDate: string;
 };
 
+function TopicSelect({
+  topics,
+  defaultValue = "",
+  errors,
+}: {
+  topics: TopicOption[];
+  defaultValue?: string;
+  errors?: typeof initialFormState.errors;
+}) {
+  if (topics.length === 0) return null;
+
+  return (
+    <label className="text-sm font-medium">
+      Tópico do edital{" "}
+      <span className="font-normal text-muted-foreground">(opcional)</span>
+      <select
+        name="topicId"
+        defaultValue={defaultValue}
+        className={`${fieldClassName} mt-1.5`}
+      >
+        <option value="">Sem tópico específico</option>
+        {topics.map((topic) => (
+          <option key={topic.id} value={topic.id}>
+            {topicOptionLabel(topic)}
+          </option>
+        ))}
+      </select>
+      <FieldError errors={errors} name="topicId" />
+    </label>
+  );
+}
+
 export function StudySessionForm({
   subjects,
+  topics,
   defaultDate,
 }: RecordFormProps) {
   const [state, formAction] = useActionState(
@@ -86,6 +121,7 @@ export function StudySessionForm({
           />
           <FieldError errors={state.errors} name="durationMinutes" />
         </label>
+        <TopicSelect topics={topics} errors={state.errors} />
       </div>
 
       <label className="block text-sm font-medium">
@@ -118,6 +154,7 @@ export function StudySessionForm({
 
 export function QuestionLogForm({
   subjects,
+  topics,
   defaultDate,
 }: RecordFormProps) {
   const [state, formAction] = useActionState(
@@ -186,6 +223,7 @@ export function QuestionLogForm({
             <FieldError errors={state.errors} name="correctAnswers" />
           </label>
         </div>
+        <TopicSelect topics={topics} errors={state.errors} />
       </div>
 
       <label className="block text-sm font-medium">
@@ -274,16 +312,19 @@ type StudySessionEditFormProps = {
   session: {
     id: string;
     subjectId: string;
+    topicId: string;
     studiedAt: string;
     durationMinutes: number;
     notes: string;
   };
   subjects: Option[];
+  topics: TopicOption[];
 };
 
 export function StudySessionEditForm({
   session,
   subjects,
+  topics,
 }: StudySessionEditFormProps) {
   const [state, formAction] = useActionState(
     updateStudySession,
@@ -331,6 +372,11 @@ export function StudySessionEditForm({
           />
           <FieldError errors={state.errors} name="durationMinutes" />
         </label>
+        <TopicSelect
+          topics={topics}
+          defaultValue={session.topicId}
+          errors={state.errors}
+        />
       </div>
       <label className="block text-sm font-medium">
         Anotações
@@ -354,17 +400,20 @@ type QuestionLogEditFormProps = {
   log: {
     id: string;
     subjectId: string;
+    topicId: string;
     answeredAt: string;
     questionsAnswered: number;
     correctAnswers: number;
     notes: string;
   };
   subjects: Option[];
+  topics: TopicOption[];
 };
 
 export function QuestionLogEditForm({
   log,
   subjects,
+  topics,
 }: QuestionLogEditFormProps) {
   const [state, formAction] = useActionState(
     updateQuestionLog,
@@ -422,6 +471,11 @@ export function QuestionLogEditForm({
           />
           <FieldError errors={state.errors} name="correctAnswers" />
         </label>
+        <TopicSelect
+          topics={topics}
+          defaultValue={log.topicId}
+          errors={state.errors}
+        />
       </div>
       <label className="block text-sm font-medium">
         Anotações

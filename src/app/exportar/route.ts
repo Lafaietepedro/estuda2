@@ -83,15 +83,20 @@ export async function GET(request: NextRequest) {
         ...(start ? { studiedAt: { gte: start } } : {}),
       },
       orderBy: [{ studiedAt: "desc" }, { createdAt: "desc" }],
-      include: { user: true, subject: true },
+      include: { user: true, subject: true, topic: { include: { parent: true } } },
     });
 
     return csvResponse("estuda2-sessoes.csv", [
-      ["Data", "Pessoa", "Matéria", "Duração (min)", "Anotações"],
+      ["Data", "Pessoa", "Matéria", "Tópico", "Duração (min)", "Anotações"],
       ...sessions.map((session) => [
         formatDateInput(session.studiedAt),
         session.user.name,
         session.subject.name,
+        session.topic
+          ? session.topic.parent
+            ? `${session.topic.parent.name} > ${session.topic.name}`
+            : session.topic.name
+          : null,
         session.durationMinutes,
         session.notes,
       ]),
@@ -104,7 +109,7 @@ export async function GET(request: NextRequest) {
       ...(start ? { answeredAt: { gte: start } } : {}),
     },
     orderBy: [{ answeredAt: "desc" }, { createdAt: "desc" }],
-    include: { user: true, subject: true },
+    include: { user: true, subject: true, topic: { include: { parent: true } } },
   });
 
   return csvResponse("estuda2-questoes.csv", [
@@ -112,6 +117,7 @@ export async function GET(request: NextRequest) {
       "Data",
       "Pessoa",
       "Matéria",
+      "Tópico",
       "Questões",
       "Acertos",
       "Aproveitamento (%)",
@@ -121,6 +127,11 @@ export async function GET(request: NextRequest) {
       formatDateInput(log.answeredAt),
       log.user.name,
       log.subject.name,
+      log.topic
+        ? log.topic.parent
+          ? `${log.topic.parent.name} > ${log.topic.name}`
+          : log.topic.name
+        : null,
       log.questionsAnswered,
       log.correctAnswers,
       Math.round((log.correctAnswers / log.questionsAnswered) * 100),

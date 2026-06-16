@@ -18,6 +18,10 @@ import {
 } from "@/lib/session";
 
 const idSchema = z.string().min(1, "Selecione uma opção.");
+const optionalIdSchema = z.preprocess(
+  (value) => (value === "" || value === undefined ? null : value),
+  z.string().min(1).nullable(),
+);
 const dateSchema = z
   .string()
   .regex(/^\d{4}-\d{2}-\d{2}$/, "Informe uma data válida.");
@@ -53,6 +57,7 @@ function revalidateRecords() {
   revalidatePath("/relatorios");
   revalidatePath("/comparativo");
   revalidatePath("/planejamento");
+  revalidatePath("/edital");
 }
 
 async function requireOwner() {
@@ -72,8 +77,33 @@ async function validateActiveSubject(subjectId: string) {
   return workspace;
 }
 
+async function validateTopicSelection(
+  subjectId: string,
+  topicId: string | null,
+  previousTopicId?: string | null,
+) {
+  if (!topicId) return null;
+
+  const workspace = await getWorkspace();
+  const topic = await prisma.topic.findFirst({
+    where: { id: topicId, examId: workspace.id },
+    include: { parent: true },
+  });
+  if (
+    !topic ||
+    topic.subjectId !== subjectId ||
+    (topic.archivedAt && topic.id !== previousTopicId) ||
+    (topic.parent?.archivedAt && topic.id !== previousTopicId)
+  ) {
+    throw new Error("Tópico inválido para a matéria selecionada.");
+  }
+
+  return topic;
+}
+
 const studySessionSchema = z.object({
   subjectId: idSchema,
+  topicId: optionalIdSchema,
   studiedAt: dateSchema,
   durationMinutes: z.coerce
     .number()
@@ -92,10 +122,12 @@ export async function createStudySession(
 
   try {
     const workspace = await validateActiveSubject(parsed.data.subjectId);
+    await validateTopicSelection(parsed.data.subjectId, parsed.data.topicId);
     await prisma.studySession.create({
       data: {
         userId: workspace.currentUser.id,
         subjectId: parsed.data.subjectId,
+        topicId: parsed.data.topicId,
         examId: workspace.id,
         studiedAt: parseLocalDate(parsed.data.studiedAt),
         durationMinutes: parsed.data.durationMinutes,
@@ -145,11 +177,17 @@ export async function updateStudySession(
     ) {
       throw new Error("Matéria inválida ou arquivada.");
     }
+    await validateTopicSelection(
+      parsed.data.subjectId,
+      parsed.data.topicId,
+      session.topicId,
+    );
 
     await prisma.studySession.update({
       where: { id: session.id },
       data: {
         subjectId: parsed.data.subjectId,
+        topicId: parsed.data.topicId,
         studiedAt: parseLocalDate(parsed.data.studiedAt),
         durationMinutes: parsed.data.durationMinutes,
         notes: parsed.data.notes || null,
@@ -168,6 +206,7 @@ export async function updateStudySession(
 const questionLogSchema = z
   .object({
     subjectId: idSchema,
+    topicId: optionalIdSchema,
     answeredAt: dateSchema,
     questionsAnswered: z.coerce
       .number()
@@ -198,10 +237,12 @@ export async function createQuestionLog(
 
   try {
     const workspace = await validateActiveSubject(parsed.data.subjectId);
+    await validateTopicSelection(parsed.data.subjectId, parsed.data.topicId);
     await prisma.questionLog.create({
       data: {
         userId: workspace.currentUser.id,
         subjectId: parsed.data.subjectId,
+        topicId: parsed.data.topicId,
         examId: workspace.id,
         answeredAt: parseLocalDate(parsed.data.answeredAt),
         questionsAnswered: parsed.data.questionsAnswered,
@@ -249,11 +290,17 @@ export async function updateQuestionLog(
     if (!subject || (subject.archivedAt && subject.id !== log.subjectId)) {
       throw new Error("Matéria inválida ou arquivada.");
     }
+    await validateTopicSelection(
+      parsed.data.subjectId,
+      parsed.data.topicId,
+      log.topicId,
+    );
 
     await prisma.questionLog.update({
       where: { id: log.id },
       data: {
         subjectId: parsed.data.subjectId,
+        topicId: parsed.data.topicId,
         answeredAt: parseLocalDate(parsed.data.answeredAt),
         questionsAnswered: parsed.data.questionsAnswered,
         correctAnswers: parsed.data.correctAnswers,
@@ -273,6 +320,7 @@ export async function updateQuestionLog(
 const planItemSchema = z.object({
   kind: z.nativeEnum(PlanItemKind),
   subjectId: idSchema,
+  topicId: optionalIdSchema,
   scheduledFor: dateSchema,
   title: z
     .string()
@@ -296,6 +344,7 @@ export async function createPlanItem(
 
   try {
     const workspace = await validateActiveSubject(parsed.data.subjectId);
+    await validateTopicSelection(parsed.data.subjectId, parsed.data.topicId);
     await prisma.studyPlanItem.create({
       data: {
         kind: parsed.data.kind,
@@ -306,6 +355,7 @@ export async function createPlanItem(
         userId: workspace.currentUser.id,
         examId: workspace.id,
         subjectId: parsed.data.subjectId,
+        topicId: parsed.data.topicId,
       },
     });
     revalidateRecords();
@@ -352,6 +402,11 @@ export async function updatePlanItem(
     if (!subject || (subject.archivedAt && subject.id !== item.subjectId)) {
       throw new Error("Matéria inválida ou arquivada.");
     }
+    await validateTopicSelection(
+      parsed.data.subjectId,
+      parsed.data.topicId,
+      item.topicId,
+    );
 
     await prisma.studyPlanItem.update({
       where: { id: item.id },
@@ -362,6 +417,7 @@ export async function updatePlanItem(
         estimatedMinutes: parsed.data.estimatedMinutes,
         notes: parsed.data.notes || null,
         subjectId: parsed.data.subjectId,
+        topicId: parsed.data.topicId,
       },
     });
     revalidateRecords();
@@ -494,6 +550,127 @@ export async function updateSubject(
 
 const deleteSchema = z.object({ id: z.string().min(1) });
 
+const topicSchema = z.object({
+  subjectId: idSchema,
+  parentId: optionalIdSchema,
+  name: z
+    .string()
+    .trim()
+    .min(2, "Informe o nome do tópico.")
+    .max(120, "Use no máximo 120 caracteres."),
+  description: z
+    .string()
+    .trim()
+    .max(500, "Use no máximo 500 caracteres.")
+    .optional(),
+});
+
+async function validateTopicParent(
+  examId: string,
+  subjectId: string,
+  parentId: string | null,
+) {
+  if (!parentId) return null;
+
+  const parent = await prisma.topic.findFirst({
+    where: {
+      id: parentId,
+      examId,
+      subjectId,
+      parentId: null,
+      archivedAt: null,
+    },
+  });
+  if (!parent) throw new Error("Tópico principal inválido.");
+
+  return parent;
+}
+
+export async function createTopic(
+  _previousState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const parsed = topicSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return errorState(parsed.error);
+
+  try {
+    const workspace = await requireOwner();
+    const subject = workspace.subjects.find(
+      (item) => item.id === parsed.data.subjectId && !item.archivedAt,
+    );
+    if (!subject) throw new Error("Matéria inválida.");
+    await validateTopicParent(
+      workspace.id,
+      parsed.data.subjectId,
+      parsed.data.parentId,
+    );
+
+    const lastPosition = await prisma.topic.aggregate({
+      where: {
+        examId: workspace.id,
+        subjectId: parsed.data.subjectId,
+        parentId: parsed.data.parentId,
+      },
+      _max: { position: true },
+    });
+    await prisma.topic.create({
+      data: {
+        examId: workspace.id,
+        subjectId: parsed.data.subjectId,
+        parentId: parsed.data.parentId,
+        name: parsed.data.name,
+        description: parsed.data.description || null,
+        position: (lastPosition._max.position ?? 0) + 1,
+      },
+    });
+    revalidateRecords();
+    return { status: "success", message: "Tópico adicionado ao edital." };
+  } catch {
+    return {
+      status: "error",
+      message: "Não foi possível adicionar o tópico.",
+    };
+  }
+}
+
+const updateTopicSchema = topicSchema.pick({
+  name: true,
+  description: true,
+}).extend({
+  id: z.string().min(1),
+});
+
+export async function updateTopic(
+  _previousState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const parsed = updateTopicSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return errorState(parsed.error);
+
+  try {
+    const workspace = await requireOwner();
+    const topic = await prisma.topic.findFirst({
+      where: { id: parsed.data.id, examId: workspace.id },
+    });
+    if (!topic) throw new Error("Tópico não encontrado.");
+
+    await prisma.topic.update({
+      where: { id: topic.id },
+      data: {
+        name: parsed.data.name,
+        description: parsed.data.description || null,
+      },
+    });
+    revalidateRecords();
+    return { status: "success", message: "Tópico atualizado." };
+  } catch {
+    return {
+      status: "error",
+      message: "Não foi possível atualizar o tópico.",
+    };
+  }
+}
+
 export async function deleteStudySession(formData: FormData) {
   const parsed = deleteSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
@@ -521,6 +698,111 @@ export async function deleteQuestionLog(formData: FormData) {
       userId: workspace.currentUser.id,
     },
   });
+  revalidateRecords();
+}
+
+export async function toggleTopicArchive(formData: FormData) {
+  const parsed = z
+    .object({
+      id: z.string().min(1),
+      archived: z.enum(["true", "false"]),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  const workspace = await requireOwner();
+  const archivedAt = parsed.data.archived === "true" ? new Date() : null;
+  const topic = await prisma.topic.findFirst({
+    where: { id: parsed.data.id, examId: workspace.id },
+  });
+  if (!topic) return;
+
+  await prisma.topic.updateMany({
+    where: {
+      examId: workspace.id,
+      OR: [{ id: topic.id }, { parentId: topic.id }],
+    },
+    data: { archivedAt },
+  });
+  revalidateRecords();
+}
+
+export async function reorderTopic(formData: FormData) {
+  const parsed = z
+    .object({
+      id: z.string().min(1),
+      direction: z.enum(["up", "down"]),
+    })
+    .safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  const workspace = await requireOwner();
+  const topic = await prisma.topic.findFirst({
+    where: { id: parsed.data.id, examId: workspace.id },
+  });
+  if (!topic) return;
+
+  const siblings = await prisma.topic.findMany({
+    where: {
+      examId: workspace.id,
+      subjectId: topic.subjectId,
+      parentId: topic.parentId,
+      archivedAt:
+        topic.archivedAt === null
+          ? null
+          : { not: null },
+    },
+    orderBy: [{ position: "asc" }, { name: "asc" }],
+  });
+  const currentIndex = siblings.findIndex((item) => item.id === topic.id);
+  const targetIndex =
+    parsed.data.direction === "up" ? currentIndex - 1 : currentIndex + 1;
+  const target = siblings[targetIndex];
+  if (!target) return;
+
+  await prisma.$transaction([
+    prisma.topic.update({
+      where: { id: topic.id },
+      data: { position: target.position },
+    }),
+    prisma.topic.update({
+      where: { id: target.id },
+      data: { position: topic.position },
+    }),
+  ]);
+  revalidateRecords();
+}
+
+export async function deleteTopic(formData: FormData) {
+  const parsed = deleteSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  const workspace = await requireOwner();
+  const topic = await prisma.topic.findFirst({
+    where: { id: parsed.data.id, examId: workspace.id },
+    include: {
+      _count: {
+        select: {
+          children: true,
+          studySessions: true,
+          questionLogs: true,
+          studyPlanItems: true,
+        },
+      },
+    },
+  });
+  if (!topic) return;
+  const hasHistory =
+    topic._count.children +
+      topic._count.studySessions +
+      topic._count.questionLogs +
+      topic._count.studyPlanItems >
+    0;
+  if (hasHistory) {
+    throw new Error("Tópicos com histórico devem ser arquivados.");
+  }
+
+  await prisma.topic.delete({ where: { id: topic.id } });
   revalidateRecords();
 }
 
@@ -584,11 +866,22 @@ export async function deleteSubject(formData: FormData) {
   const subject = await prisma.subject.findFirst({
     where: { id: parsed.data.id, examId: workspace.id },
     include: {
-      _count: { select: { studySessions: true, questionLogs: true } },
+      _count: {
+        select: {
+          studySessions: true,
+          questionLogs: true,
+          studyPlanItems: true,
+        },
+      },
     },
   });
   if (!subject) return;
-  if (subject._count.studySessions + subject._count.questionLogs > 0) {
+  if (
+    subject._count.studySessions +
+      subject._count.questionLogs +
+      subject._count.studyPlanItems >
+    0
+  ) {
     throw new Error("Matérias com histórico devem ser arquivadas.");
   }
 

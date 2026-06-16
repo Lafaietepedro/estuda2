@@ -57,13 +57,32 @@ export default async function SessionsPage({
       where,
       orderBy: [{ studiedAt: "desc" }, { createdAt: "desc" }],
       take: 100,
-      include: { user: true, subject: true },
+      include: { user: true, subject: true, topic: { include: { parent: true } } },
     }),
     prisma.studySession.count({ where }),
   ]);
   const activeSubjects = workspace.subjects.filter(
     (subject) => !subject.archivedAt,
   );
+  const topics = await prisma.topic.findMany({
+    where: { examId: workspace.id },
+    orderBy: [
+      { subject: { position: "asc" } },
+      { parentId: "asc" },
+      { position: "asc" },
+      { name: "asc" },
+    ],
+    include: { subject: true, parent: true },
+  });
+  const activeTopics = topics
+    .filter((topic) => !topic.archivedAt && !topic.parent?.archivedAt)
+    .map((topic) => ({
+      id: topic.id,
+      name: topic.name,
+      subjectId: topic.subjectId,
+      subjectName: topic.subject.name,
+      parentName: topic.parent?.name ?? null,
+    }));
 
   return (
     <div className="space-y-7">
@@ -82,6 +101,7 @@ export default async function SessionsPage({
         <div className="mt-5">
           <StudySessionForm
             subjects={activeSubjects}
+            topics={activeTopics}
             defaultDate={formatDateInput()}
           />
         </div>
@@ -137,6 +157,14 @@ export default async function SessionsPage({
                       {formatDate(session.studiedAt)} ·{" "}
                       {minutesToLabel(session.durationMinutes)}
                     </p>
+                    {session.topic && (
+                      <p className="mt-1 text-xs font-medium text-muted-foreground">
+                        Tópico:{" "}
+                        {session.topic.parent
+                          ? `${session.topic.parent.name} > ${session.topic.name}`
+                          : session.topic.name}
+                      </p>
+                    )}
                     {session.notes && (
                       <p className="mt-2 text-sm leading-6">{session.notes}</p>
                     )}
@@ -154,6 +182,7 @@ export default async function SessionsPage({
                           session={{
                             id: session.id,
                             subjectId: session.subjectId,
+                            topicId: session.topicId ?? "",
                             studiedAt: formatDateInput(session.studiedAt),
                             durationMinutes: session.durationMinutes,
                             notes: session.notes ?? "",
@@ -163,6 +192,19 @@ export default async function SessionsPage({
                               !subject.archivedAt ||
                               subject.id === session.subjectId,
                           )}
+                          topics={topics
+                            .filter(
+                              (topic) =>
+                                !topic.archivedAt ||
+                                topic.id === session.topicId,
+                            )
+                            .map((topic) => ({
+                              id: topic.id,
+                              name: topic.name,
+                              subjectId: topic.subjectId,
+                              subjectName: topic.subject.name,
+                              parentName: topic.parent?.name ?? null,
+                            }))}
                         />
                       </div>
                     </details>

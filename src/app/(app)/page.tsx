@@ -83,7 +83,7 @@ export default async function DashboardPage() {
         },
         orderBy: [{ scheduledFor: "asc" }, { createdAt: "asc" }],
         take: 4,
-        include: { subject: true },
+        include: { subject: true, topic: { include: { parent: true } } },
       }),
     ]);
 
@@ -441,6 +441,13 @@ export default async function DashboardPage() {
                     {formatDate(item.scheduledFor)} ·{" "}
                     {minutesToLabel(item.estimatedMinutes)}
                   </p>
+                  {item.topic && (
+                    <p className="mt-2 line-clamp-1 text-xs text-muted-foreground">
+                      {item.topic.parent
+                        ? `${item.topic.parent.name} > ${item.topic.name}`
+                        : item.topic.name}
+                    </p>
+                  )}
                 </article>
               );
             })}

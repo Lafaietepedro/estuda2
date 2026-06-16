@@ -8,6 +8,7 @@ import {
   CalendarCheck2,
   CircleHelp,
   ClipboardList,
+  FileText,
   LayoutDashboard,
   LogOut,
   Scale,
@@ -30,6 +31,7 @@ type NavigationItem = {
 const navigationItems: NavigationItem[] = [
   { label: "Dashboard", href: "/", icon: LayoutDashboard },
   { label: "Matérias", href: "/materias", icon: BookOpen },
+  { label: "Edital", href: "/edital", icon: FileText },
   { label: "Planejamento", href: "/planejamento", icon: CalendarCheck2 },
   { label: "Sessões", href: "/sessoes", icon: TimerReset },
   { label: "Questões", href: "/questoes", icon: CircleHelp },

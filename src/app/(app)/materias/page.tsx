@@ -32,7 +32,7 @@ export const dynamic = "force-dynamic";
 export default async function SubjectsPage() {
   const workspace = await getWorkspace();
   const weekStart = startOfCurrentWeek();
-  const [sessionTotals, weeklySessionTotals, questionTotals] =
+  const [sessionTotals, weeklySessionTotals, questionTotals, planTotals] =
     await Promise.all([
       prisma.studySession.groupBy({
         by: ["subjectId"],
@@ -48,6 +48,11 @@ export default async function SubjectsPage() {
         by: ["subjectId"],
         where: { examId: workspace.id },
         _sum: { questionsAnswered: true, correctAnswers: true },
+      }),
+      prisma.studyPlanItem.groupBy({
+        by: ["subjectId"],
+        where: { examId: workspace.id },
+        _count: true,
       }),
     ]);
   const sessionMap = new Map(
@@ -68,6 +73,9 @@ export default async function SubjectsPage() {
       },
     ]),
   );
+  const planMap = new Map(
+    planTotals.map((item) => [item.subjectId, item._count]),
+  );
   const isOwner = workspace.currentMembership.role === "OWNER";
   const activeSubjects = workspace.subjects.filter(
     (subject) => !subject.archivedAt,
@@ -87,7 +95,8 @@ export default async function SubjectsPage() {
       answered: 0,
       correct: 0,
     };
-    const historyCount = questions.answered + minutes;
+    const planned = planMap.get(subject.id) ?? 0;
+    const historyCount = questions.answered + minutes + planned;
     const accuracy = questions.answered
       ? Math.round((questions.correct / questions.answered) * 100)
       : 0;
@@ -163,6 +172,10 @@ export default async function SubjectsPage() {
           <div>
             <dt className="text-xs text-muted-foreground">Aproveitamento</dt>
             <dd className="mt-1 font-semibold">{accuracy}%</dd>
+          </div>
+          <div>
+            <dt className="text-xs text-muted-foreground">Planejadas</dt>
+            <dd className="mt-1 font-semibold">{planned}</dd>
           </div>
         </dl>
 

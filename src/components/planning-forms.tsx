@@ -11,6 +11,7 @@ import {
   textareaClassName,
 } from "@/components/form-controls";
 import { initialFormState } from "@/lib/form-state";
+import { topicOptionLabel, type TopicOption } from "@/lib/topics";
 
 type SubjectOption = {
   id: string;
@@ -19,9 +20,11 @@ type SubjectOption = {
 
 type PlanItemFieldsProps = {
   subjects: SubjectOption[];
+  topics: TopicOption[];
   defaults?: {
     kind: "STUDY" | "REVIEW";
     subjectId: string;
+    topicId: string;
     scheduledFor: string;
     title: string;
     estimatedMinutes: number;
@@ -32,6 +35,7 @@ type PlanItemFieldsProps = {
 
 function PlanItemFields({
   subjects,
+  topics,
   defaults,
   state,
 }: PlanItemFieldsProps) {
@@ -76,6 +80,27 @@ function PlanItemFields({
           />
           <FieldError errors={state.errors} name="scheduledFor" />
         </label>
+        {topics.length > 0 && (
+          <label className="text-sm font-medium">
+            Tópico do edital{" "}
+            <span className="font-normal text-muted-foreground">
+              (opcional)
+            </span>
+            <select
+              name="topicId"
+              defaultValue={defaults?.topicId ?? ""}
+              className={`${fieldClassName} mt-1.5`}
+            >
+              <option value="">Sem tópico específico</option>
+              {topics.map((topic) => (
+                <option key={topic.id} value={topic.id}>
+                  {topicOptionLabel(topic)}
+                </option>
+              ))}
+            </select>
+            <FieldError errors={state.errors} name="topicId" />
+          </label>
+        )}
         <label className="text-sm font-medium">
           Duração prevista
           <input
@@ -120,9 +145,11 @@ function PlanItemFields({
 
 export function PlanItemForm({
   subjects,
+  topics,
   defaultDate,
 }: {
   subjects: SubjectOption[];
+  topics: TopicOption[];
   defaultDate: string;
 }) {
   const [state, formAction] = useActionState(createPlanItem, initialFormState);
@@ -136,9 +163,11 @@ export function PlanItemForm({
     <form ref={formRef} action={formAction} className="space-y-4">
       <PlanItemFields
         subjects={subjects}
+        topics={topics}
         defaults={{
           kind: "STUDY",
           subjectId: subjects[0]?.id ?? "",
+          topicId: "",
           scheduledFor: defaultDate,
           title: "",
           estimatedMinutes: 45,
@@ -165,24 +194,32 @@ export function PlanItemForm({
 export function PlanItemEditForm({
   item,
   subjects,
+  topics,
 }: {
   item: {
     id: string;
     kind: "STUDY" | "REVIEW";
     subjectId: string;
+    topicId: string;
     scheduledFor: string;
     title: string;
     estimatedMinutes: number;
     notes: string;
   };
   subjects: SubjectOption[];
+  topics: TopicOption[];
 }) {
   const [state, formAction] = useActionState(updatePlanItem, initialFormState);
 
   return (
     <form action={formAction} className="space-y-4">
       <input type="hidden" name="id" value={item.id} />
-      <PlanItemFields subjects={subjects} defaults={item} state={state} />
+      <PlanItemFields
+        subjects={subjects}
+        topics={topics}
+        defaults={item}
+        state={state}
+      />
       <FormMessage state={state} />
       <SubmitButton pendingLabel="Atualizando...">
         Salvar alterações

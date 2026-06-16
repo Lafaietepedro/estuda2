@@ -57,13 +57,32 @@ export default async function QuestionsPage({
       where,
       orderBy: [{ answeredAt: "desc" }, { createdAt: "desc" }],
       take: 100,
-      include: { user: true, subject: true },
+      include: { user: true, subject: true, topic: { include: { parent: true } } },
     }),
     prisma.questionLog.count({ where }),
   ]);
   const activeSubjects = workspace.subjects.filter(
     (subject) => !subject.archivedAt,
   );
+  const topics = await prisma.topic.findMany({
+    where: { examId: workspace.id },
+    orderBy: [
+      { subject: { position: "asc" } },
+      { parentId: "asc" },
+      { position: "asc" },
+      { name: "asc" },
+    ],
+    include: { subject: true, parent: true },
+  });
+  const activeTopics = topics
+    .filter((topic) => !topic.archivedAt && !topic.parent?.archivedAt)
+    .map((topic) => ({
+      id: topic.id,
+      name: topic.name,
+      subjectId: topic.subjectId,
+      subjectName: topic.subject.name,
+      parentName: topic.parent?.name ?? null,
+    }));
 
   return (
     <div className="space-y-7">
@@ -82,6 +101,7 @@ export default async function QuestionsPage({
         <div className="mt-5">
           <QuestionLogForm
             subjects={activeSubjects}
+            topics={activeTopics}
             defaultDate={formatDateInput()}
           />
         </div>
@@ -142,6 +162,14 @@ export default async function QuestionsPage({
                         {formatDate(log.answeredAt)} · {log.correctAnswers} de{" "}
                         {log.questionsAnswered} acertos
                       </p>
+                      {log.topic && (
+                        <p className="mt-1 text-xs font-medium text-muted-foreground">
+                          Tópico:{" "}
+                          {log.topic.parent
+                            ? `${log.topic.parent.name} > ${log.topic.name}`
+                            : log.topic.name}
+                        </p>
+                      )}
                       {log.notes && (
                         <p className="mt-2 text-sm leading-6">{log.notes}</p>
                       )}
@@ -163,6 +191,7 @@ export default async function QuestionsPage({
                               log={{
                                 id: log.id,
                                 subjectId: log.subjectId,
+                                topicId: log.topicId ?? "",
                                 answeredAt: formatDateInput(log.answeredAt),
                                 questionsAnswered: log.questionsAnswered,
                                 correctAnswers: log.correctAnswers,
@@ -173,6 +202,19 @@ export default async function QuestionsPage({
                                   !subject.archivedAt ||
                                   subject.id === log.subjectId,
                               )}
+                              topics={topics
+                                .filter(
+                                  (topic) =>
+                                    !topic.archivedAt ||
+                                    topic.id === log.topicId,
+                                )
+                                .map((topic) => ({
+                                  id: topic.id,
+                                  name: topic.name,
+                                  subjectId: topic.subjectId,
+                                  subjectName: topic.subject.name,
+                                  parentName: topic.parent?.name ?? null,
+                                }))}
                             />
                           </div>
                         </details>

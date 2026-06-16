@@ -47,11 +47,30 @@ export default async function PlanningPage() {
     },
     orderBy: [{ completedAt: "asc" }, { scheduledFor: "asc" }],
     take: 250,
-    include: { subject: true },
+    include: { subject: true, topic: { include: { parent: true } } },
+  });
+  const topics = await prisma.topic.findMany({
+    where: { examId: workspace.id },
+    orderBy: [
+      { subject: { position: "asc" } },
+      { parentId: "asc" },
+      { position: "asc" },
+      { name: "asc" },
+    ],
+    include: { subject: true, parent: true },
   });
   const activeSubjects = workspace.subjects.filter(
     (subject) => !subject.archivedAt,
   );
+  const activeTopics = topics
+    .filter((topic) => !topic.archivedAt && !topic.parent?.archivedAt)
+    .map((topic) => ({
+      id: topic.id,
+      name: topic.name,
+      subjectId: topic.subjectId,
+      subjectName: topic.subject.name,
+      parentName: topic.parent?.name ?? null,
+    }));
   const pending = items.filter((item) => !item.completedAt);
   const overdue = pending.filter((item) => item.scheduledFor < today);
   const todayItems = pending.filter(
@@ -120,6 +139,14 @@ export default async function PlanningPage() {
               {formatDate(item.scheduledFor)} ·{" "}
               {minutesToLabel(item.estimatedMinutes)}
             </p>
+            {item.topic && (
+              <p className="mt-1 text-xs font-medium text-muted-foreground">
+                Tópico:{" "}
+                {item.topic.parent
+                  ? `${item.topic.parent.name} > ${item.topic.name}`
+                  : item.topic.name}
+              </p>
+            )}
             {item.notes && (
               <p className="mt-3 text-sm leading-6">{item.notes}</p>
             )}
@@ -154,12 +181,24 @@ export default async function PlanningPage() {
                   id: item.id,
                   kind: item.kind,
                   subjectId: item.subjectId,
+                  topicId: item.topicId ?? "",
                   scheduledFor: formatDateInput(item.scheduledFor),
                   title: item.title,
                   estimatedMinutes: item.estimatedMinutes,
                   notes: item.notes ?? "",
                 }}
                 subjects={editableSubjects}
+                topics={topics
+                  .filter(
+                    (topic) => !topic.archivedAt || topic.id === item.topicId,
+                  )
+                  .map((topic) => ({
+                    id: topic.id,
+                    name: topic.name,
+                    subjectId: topic.subjectId,
+                    subjectName: topic.subject.name,
+                    parentName: topic.parent?.name ?? null,
+                  }))}
               />
             </div>
           </details>
@@ -219,7 +258,11 @@ export default async function PlanningPage() {
           </div>
         </div>
         <div className="mt-5">
-          <PlanItemForm subjects={activeSubjects} defaultDate={todayKey} />
+          <PlanItemForm
+            subjects={activeSubjects}
+            topics={activeTopics}
+            defaultDate={todayKey}
+          />
         </div>
       </section>
 
