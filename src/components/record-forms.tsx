@@ -29,6 +29,8 @@ type RecordFormProps = {
   subjects: Option[];
   topics: TopicOption[];
   defaultDate: string;
+  reviewSummary: string;
+  reviewMinutes: number;
 };
 
 function TopicSelect({
@@ -67,6 +69,8 @@ export function StudySessionForm({
   subjects,
   topics,
   defaultDate,
+  reviewSummary,
+  reviewMinutes,
 }: RecordFormProps) {
   const [state, formAction] = useActionState(
     createStudySession,
@@ -145,7 +149,8 @@ export function StudySessionForm({
         <span>
           <span className="font-medium">Criar revisões automáticas</span>
           <span className="mt-1 block text-muted-foreground">
-            Programa revisões em 1, 7 e 30 dias para esta matéria ou tópico.
+            Programa revisões em {reviewSummary}, com {reviewMinutes} minutos
+            cada, para esta matéria ou tópico.
           </span>
         </span>
       </label>
@@ -171,7 +176,7 @@ export function QuestionLogForm({
   subjects,
   topics,
   defaultDate,
-}: RecordFormProps) {
+}: Omit<RecordFormProps, "reviewSummary" | "reviewMinutes">) {
   const [state, formAction] = useActionState(
     createQuestionLog,
     initialFormState,

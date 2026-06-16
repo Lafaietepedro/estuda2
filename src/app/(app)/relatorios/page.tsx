@@ -11,6 +11,7 @@ import {
 } from "@/lib/data-filters";
 import { minutesToLabel } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
+import { topicOptionLabel } from "@/lib/topics";
 
 export const metadata = {
   title: "Relatórios",
@@ -52,7 +53,13 @@ export default async function ReportsPage({
     ...commonWhere,
     ...(start ? { answeredAt: { gte: start } } : {}),
   } satisfies Prisma.QuestionLogWhereInput;
-  const [sessionTotals, questionTotals, sessionCount] = await Promise.all([
+  const [
+    sessionTotals,
+    questionTotals,
+    sessionCount,
+    topicSessionTotals,
+    topicQuestionTotals,
+  ] = await Promise.all([
     prisma.studySession.groupBy({
       by: ["subjectId"],
       where: sessionWhere,
@@ -64,6 +71,16 @@ export default async function ReportsPage({
       _sum: { questionsAnswered: true, correctAnswers: true },
     }),
     prisma.studySession.count({ where: sessionWhere }),
+    prisma.studySession.groupBy({
+      by: ["topicId"],
+      where: { ...sessionWhere, topicId: { not: null } },
+      _sum: { durationMinutes: true },
+    }),
+    prisma.questionLog.groupBy({
+      by: ["topicId"],
+      where: { ...questionWhere, topicId: { not: null } },
+      _sum: { questionsAnswered: true, correctAnswers: true },
+    }),
   ]);
   const sessionsBySubject = new Map(
     sessionTotals.map((item) => [item.subjectId, item._sum.durationMinutes ?? 0]),
@@ -71,6 +88,21 @@ export default async function ReportsPage({
   const questionsBySubject = new Map(
     questionTotals.map((item) => [
       item.subjectId,
+      {
+        answered: item._sum.questionsAnswered ?? 0,
+        correct: item._sum.correctAnswers ?? 0,
+      },
+    ]),
+  );
+  const sessionsByTopic = new Map(
+    topicSessionTotals.map((item) => [
+      item.topicId,
+      item._sum.durationMinutes ?? 0,
+    ]),
+  );
+  const questionsByTopic = new Map(
+    topicQuestionTotals.map((item) => [
+      item.topicId,
       {
         answered: item._sum.questionsAnswered ?? 0,
         correct: item._sum.correctAnswers ?? 0,
@@ -110,6 +142,53 @@ export default async function ReportsPage({
     ? Math.round((totalCorrect / totalAnswered) * 100)
     : 0;
   const maxMinutes = Math.max(...rows.map((row) => row.minutes), 60);
+  const topicIds = [
+    ...new Set([
+      ...topicSessionTotals.map((item) => item.topicId).filter(Boolean),
+      ...topicQuestionTotals.map((item) => item.topicId).filter(Boolean),
+    ]),
+  ] as string[];
+  const topics = topicIds.length
+    ? await prisma.topic.findMany({
+        where: { id: { in: topicIds }, examId: workspace.id },
+        include: { subject: true, parent: true },
+      })
+    : [];
+  const topicRows = topics
+    .map((topic) => {
+      const questions = questionsByTopic.get(topic.id) ?? {
+        answered: 0,
+        correct: 0,
+      };
+      return {
+        id: topic.id,
+        label: topicOptionLabel({
+          id: topic.id,
+          name: topic.name,
+          subjectId: topic.subjectId,
+          subjectName: topic.subject.name,
+          parentName: topic.parent?.name ?? null,
+        }),
+        color: topic.subject.color,
+        archived: Boolean(topic.archivedAt || topic.parent?.archivedAt),
+        minutes: sessionsByTopic.get(topic.id) ?? 0,
+        answered: questions.answered,
+        correct: questions.correct,
+        accuracy: questions.answered
+          ? Math.round((questions.correct / questions.answered) * 100)
+          : 0,
+      };
+    })
+    .sort(
+      (first, second) =>
+        second.minutes - first.minutes ||
+        second.answered - first.answered ||
+        first.label.localeCompare(second.label),
+    );
+  const maxTopicMinutes = Math.max(
+    ...topicRows.map((row) => row.minutes),
+    60,
+  );
   const scopeLabel =
     scope === "mine" ? workspace.currentUser.name : "Toda a dupla";
 
@@ -191,6 +270,55 @@ export default async function ReportsPage({
                     style={{
                       backgroundColor: row.color,
                       width: `${(row.minutes / maxMinutes) * 100}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+        <h2 className="text-lg font-semibold">Desempenho por tópico</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Use esta visão para encontrar os pontos do edital que mais receberam
+          esforço e os que precisam de mais questões.
+        </p>
+        {topicRows.length === 0 ? (
+          <p className="mt-6 rounded-xl border border-dashed px-4 py-10 text-center text-sm text-muted-foreground">
+            Nenhum registro com tópico encontrado para os filtros escolhidos.
+          </p>
+        ) : (
+          <div className="mt-6 space-y-5">
+            {topicRows.map((row) => (
+              <div key={row.id}>
+                <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex min-w-0 items-center gap-2">
+                    <span
+                      className="size-3 shrink-0 rounded-full"
+                      style={{ backgroundColor: row.color }}
+                    />
+                    <span className="truncate text-sm font-semibold">
+                      {row.label}
+                    </span>
+                    {row.archived && (
+                      <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                        Arquivado
+                      </span>
+                    )}
+                  </div>
+                  <span className="text-xs text-muted-foreground">
+                    {minutesToLabel(row.minutes)} · {row.answered} questões ·{" "}
+                    {row.accuracy}% de acertos
+                  </span>
+                </div>
+                <div className="h-2.5 overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full"
+                    style={{
+                      backgroundColor: row.color,
+                      width: `${(row.minutes / maxTopicMinutes) * 100}%`,
                     }}
                   />
                 </div>

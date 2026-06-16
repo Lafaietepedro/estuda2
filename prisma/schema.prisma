@@ -38,6 +38,8 @@ model Exam {
   description       String?
   examDate          DateTime?
   weeklyGoalMinutes Int              @default(300)
+  reviewIntervals   String           @default("1,7,30")
+  reviewMinutes     Int              @default(30)
   createdAt         DateTime         @default(now())
   updatedAt         DateTime         @updatedAt
   memberships       ExamMembership[]

@@ -78,6 +78,8 @@ export default async function SettingsPage({
               ? formatDateInput(workspace.examDate)
               : "",
             weeklyGoalMinutes: workspace.weeklyGoalMinutes,
+            reviewIntervals: workspace.reviewIntervals,
+            reviewMinutes: workspace.reviewMinutes,
           }}
           users={[
             users[0],

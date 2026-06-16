@@ -18,6 +18,7 @@ import {
 } from "@/lib/data-filters";
 import { formatDate, formatDateInput, minutesToLabel } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
+import { reviewIntervalsSummary } from "@/lib/reviews";
 
 export const metadata = {
   title: "Sessões",
@@ -103,6 +104,8 @@ export default async function SessionsPage({
             subjects={activeSubjects}
             topics={activeTopics}
             defaultDate={formatDateInput()}
+            reviewSummary={reviewIntervalsSummary(workspace.reviewIntervals)}
+            reviewMinutes={workspace.reviewMinutes}
           />
         </div>
       </section>

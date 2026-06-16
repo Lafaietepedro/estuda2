@@ -18,6 +18,8 @@ type SettingsFormProps = {
     description: string;
     examDate: string;
     weeklyGoalMinutes: number;
+    reviewIntervals: string;
+    reviewMinutes: number;
   };
   users: [
     { id: string; name: string; login: string; weeklyGoalMinutes: number | null },
@@ -128,6 +130,43 @@ export function SettingsForm({ exam, users }: SettingsFormProps) {
           <FieldError errors={state.errors} name="weeklyGoalMinutes" />
         </label>
       </div>
+
+      <fieldset className="space-y-4 rounded-xl border p-4">
+        <legend className="px-2 text-sm font-semibold">
+          Revisões automáticas
+        </legend>
+        <p className="text-sm leading-6 text-muted-foreground">
+          Quando uma sessão for registrada com revisões automáticas, o app usa
+          estes dias para criar atividades no planejamento.
+        </p>
+        <div className="grid gap-4 sm:grid-cols-[1fr_220px]">
+          <label className="text-sm font-medium">
+            Dias após o estudo
+            <input
+              name="reviewIntervals"
+              defaultValue={exam.reviewIntervals}
+              placeholder="1,7,30"
+              className={`${fieldClassName} mt-1.5`}
+            />
+            <FieldError errors={state.errors} name="reviewIntervals" />
+            <span className="mt-1 block text-xs text-muted-foreground">
+              Separe por vírgula. Ex.: 1, 7, 30, 60.
+            </span>
+          </label>
+          <label className="text-sm font-medium">
+            Minutos por revisão
+            <input
+              name="reviewMinutes"
+              type="number"
+              min={5}
+              max={1440}
+              defaultValue={exam.reviewMinutes}
+              className={`${fieldClassName} mt-1.5`}
+            />
+            <FieldError errors={state.errors} name="reviewMinutes" />
+          </label>
+        </div>
+      </fieldset>
 
       <label className="block text-sm font-medium">
         Descrição <span className="font-normal text-muted-foreground">(opcional)</span>

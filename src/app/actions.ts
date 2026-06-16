@@ -12,6 +12,12 @@ import type { FormState } from "@/lib/form-state";
 import { hashPassword, verifyPassword } from "@/lib/passwords";
 import { prisma } from "@/lib/prisma";
 import {
+  addDays,
+  normalizeReviewIntervals,
+  parseReviewIntervals,
+  reviewIntervalLabel,
+} from "@/lib/reviews";
+import {
   createSessionToken,
   SESSION_COOKIE,
   sessionCookieOptions,
@@ -40,6 +46,24 @@ const optionalPasswordSchema = z
     message: "Use pelo menos 6 caracteres.",
   })
   .optional();
+const reviewIntervalsSchema = z
+  .string()
+  .trim()
+  .refine(
+    (value) => {
+      try {
+        parseReviewIntervals(value);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+    {
+      message:
+        "Informe dias entre 1 e 365, separados por vírgula. Ex.: 1,7,30",
+    },
+  )
+  .transform((value) => normalizeReviewIntervals(value));
 
 function errorState(error: z.ZodError): FormState {
   return {
@@ -114,12 +138,6 @@ const studySessionSchema = z.object({
   autoReviews: z.enum(["on"]).optional(),
 });
 
-function addDays(date: Date, days: number) {
-  const nextDate = new Date(date);
-  nextDate.setUTCDate(nextDate.getUTCDate() + days);
-  return nextDate;
-}
-
 export async function createStudySession(
   _previousState: FormState,
   formData: FormData,
@@ -158,19 +176,15 @@ export async function createStudySession(
             ? `${topic.parent.name} > ${topic.name}`
             : topic.name
           : subject?.name ?? "conteúdo estudado";
-        const reviewPlan = [
-          { days: 1, label: "1 dia" },
-          { days: 7, label: "7 dias" },
-          { days: 30, label: "30 dias" },
-        ];
+        const reviewPlan = parseReviewIntervals(workspace.reviewIntervals);
 
         await tx.studyPlanItem.createMany({
-          data: reviewPlan.map((review) => ({
+          data: reviewPlan.map((days) => ({
             kind: PlanItemKind.REVIEW,
             title: `Revisar ${targetName}`,
-            scheduledFor: addDays(studiedAt, review.days),
-            estimatedMinutes: 30,
-            notes: `Revisão automática de ${review.label} gerada a partir da sessão de estudo.`,
+            scheduledFor: addDays(studiedAt, days),
+            estimatedMinutes: workspace.reviewMinutes,
+            notes: `Revisão automática de ${reviewIntervalLabel(days)} gerada a partir da sessão de estudo.`,
             userId: workspace.currentUser.id,
             examId: workspace.id,
             subjectId: parsed.data.subjectId,
@@ -964,6 +978,12 @@ const settingsSchema = z.object({
     .int("Use minutos inteiros.")
     .min(1, "Informe pelo menos 1 minuto.")
     .max(10080, "A meta não pode superar uma semana inteira."),
+  reviewIntervals: reviewIntervalsSchema,
+  reviewMinutes: z.coerce
+    .number()
+    .int("Use minutos inteiros.")
+    .min(5, "Planeje pelo menos 5 minutos por revisão.")
+    .max(1440, "A revisão máxima é de 24 horas."),
   firstUserId: z.string().min(1),
   firstUserName: z.string().trim().min(2).max(60),
   firstUserLogin: loginNameSchema,
@@ -1020,6 +1040,8 @@ export async function updateSettings(
             ? parseLocalDate(parsed.data.examDate)
             : null,
           weeklyGoalMinutes: parsed.data.weeklyGoalMinutes,
+          reviewIntervals: parsed.data.reviewIntervals,
+          reviewMinutes: parsed.data.reviewMinutes,
         },
       }),
       prisma.user.update({
