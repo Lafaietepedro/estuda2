@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import {
   ArrowUpRight,
   BookOpen,
@@ -9,6 +8,7 @@ import {
   Clock3,
   Flame,
   Plus,
+  Settings,
   Target,
 } from "lucide-react";
 
@@ -34,10 +34,6 @@ export default async function DashboardPage() {
       workspace.memberships.some((membership) =>
         /^Pessoa [12]$/.test(membership.user.name),
       ));
-
-  if (needsSetup) {
-    redirect("/configuracoes?primeiro-acesso=1");
-  }
 
   const weekStart = startOfCurrentWeek();
   const today = parseLocalDate(formatDateInput());
@@ -246,6 +242,33 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-7">
+      {needsSetup && (
+        <section className="rounded-[1.75rem] border border-secondary/25 bg-secondary/10 p-5 shadow-paper sm:flex sm:items-center sm:justify-between sm:gap-6">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-secondary">
+              Primeiro ajuste
+            </p>
+            <h2 className="mt-2 text-2xl font-bold">
+              Personalize o espaço quando quiser.
+            </h2>
+            <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground">
+              O dashboard já está liberado. Atualize nomes, concurso, metas e
+              senhas em configurações para tirar os rótulos genéricos.
+            </p>
+          </div>
+          <Link
+            href="/configuracoes?primeiro-acesso=1"
+            className={cn(
+              buttonVariants({ variant: "outline" }),
+              "mt-4 sm:mt-0",
+            )}
+          >
+            <Settings aria-hidden="true" />
+            Abrir configurações
+          </Link>
+        </section>
+      )}
+
       <section className="overflow-hidden rounded-[2rem] border bg-card/90 shadow-soft backdrop-blur">
         <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1.25fr_0.75fr] lg:p-8">
           <div>
