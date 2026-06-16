@@ -71,9 +71,9 @@ export function SidebarNavigation({
       </div>
 
       <div className="px-4 pt-6">
-        <div className="rounded-xl border border-sidebar-border bg-white/60 p-3 shadow-sm">
+        <div className="rounded-3xl border border-sidebar-border bg-background/70 p-4 shadow-paper">
           <div className="flex items-center gap-3">
-            <div className="flex size-9 items-center justify-center rounded-lg bg-amber-100 text-amber-700">
+            <div className="flex size-10 items-center justify-center rounded-2xl bg-secondary/15 text-secondary">
               <ClipboardList className="size-4" aria-hidden="true" />
             </div>
             <div className="min-w-0">
@@ -88,7 +88,7 @@ export function SidebarNavigation({
         </div>
       </div>
 
-      <nav className="flex-1 space-y-1 px-4 py-6" aria-label="Navegação principal">
+      <nav className="flex-1 space-y-1.5 px-4 py-6" aria-label="Navegação principal">
         {navigationItems.map((item) => {
           const isActive =
             item.href === "/"
@@ -104,8 +104,8 @@ export function SidebarNavigation({
               className={cn(
                 "group flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-sidebar-primary text-sidebar-primary-foreground shadow-sm"
-                  : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+                  ? "rounded-2xl bg-sidebar-primary text-sidebar-primary-foreground shadow-paper"
+                  : "rounded-2xl text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               )}
             >
               <Icon
@@ -124,8 +124,8 @@ export function SidebarNavigation({
       </nav>
 
       <div className="border-t border-sidebar-border p-4">
-        <div className="flex items-center gap-3 rounded-xl bg-sidebar-accent/70 p-3">
-          <span className="flex size-9 items-center justify-center rounded-full bg-violet-100 text-xs font-bold text-violet-700">
+        <div className="flex items-center gap-3 rounded-3xl bg-sidebar-accent/70 p-3">
+          <span className="flex size-10 items-center justify-center rounded-2xl bg-primary/10 text-xs font-bold text-primary">
             {initials(currentUser.name)}
           </span>
           <div className="min-w-0">

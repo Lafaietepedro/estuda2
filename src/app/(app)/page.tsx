@@ -50,6 +50,8 @@ export default async function DashboardPage() {
     recentSessions,
     recentQuestions,
     nextPlanItems,
+    todayPlanCount,
+    overduePlanCount,
   ] = await Promise.all([
       prisma.studySession.findMany({
         where: { examId: workspace.id, studiedAt: { gte: sevenDaysAgo } },
@@ -84,6 +86,22 @@ export default async function DashboardPage() {
         orderBy: [{ scheduledFor: "asc" }, { createdAt: "asc" }],
         take: 4,
         include: { subject: true, topic: { include: { parent: true } } },
+      }),
+      prisma.studyPlanItem.count({
+        where: {
+          examId: workspace.id,
+          userId: workspace.currentUser.id,
+          completedAt: null,
+          scheduledFor: today,
+        },
+      }),
+      prisma.studyPlanItem.count({
+        where: {
+          examId: workspace.id,
+          userId: workspace.currentUser.id,
+          completedAt: null,
+          scheduledFor: { lt: today },
+        },
       }),
     ]);
 
@@ -177,7 +195,7 @@ export default async function DashboardPage() {
       value: minutesToLabel(personalMinutes),
       helper: "Minha semana",
       icon: Clock3,
-      accent: "bg-violet-100 text-violet-700",
+      accent: "bg-primary/10 text-primary",
     },
     {
       label: "Minhas questões",
@@ -186,7 +204,7 @@ export default async function DashboardPage() {
         ? `${personalAccuracy}% de acertos`
         : "Minha semana",
       icon: CircleCheck,
-      accent: "bg-emerald-100 text-emerald-700",
+      accent: "bg-green-100 text-green-700",
     },
     {
       label: "Tempo da dupla",
@@ -195,7 +213,7 @@ export default async function DashboardPage() {
         ? `${questionsAnswered} questões · ${accuracy}%`
         : "Nesta semana",
       icon: Target,
-      accent: "bg-amber-100 text-amber-700",
+      accent: "bg-secondary/15 text-secondary",
     },
     {
       label: "Matérias ativas",
@@ -204,7 +222,7 @@ export default async function DashboardPage() {
       ),
       helper: "No plano atual",
       icon: BookOpen,
-      accent: "bg-sky-100 text-sky-700",
+      accent: "bg-accent/15 text-accent",
     },
   ];
   const weeklyGoalMinutes = workspace.weeklyGoalMinutes;
@@ -228,36 +246,59 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-7">
-      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
-            Visão geral
-          </p>
-          <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">
-            Oi, {workspace.currentUser.name}!
-          </h1>
-          <p className="mt-2 text-sm text-muted-foreground sm:text-base">
-            Cada registro deixa o caminho até {workspace.name} mais claro.
-          </p>
-          {examCountdown && (
-            <p className="mt-3 inline-flex items-center gap-2 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-semibold text-violet-700">
-              <CalendarDays className="size-4" aria-hidden="true" />
-              {examCountdown}
+      <section className="overflow-hidden rounded-[2rem] border bg-card/90 shadow-soft backdrop-blur">
+        <div className="grid gap-6 p-5 sm:p-7 lg:grid-cols-[1.25fr_0.75fr] lg:p-8">
+          <div>
+            <p className="mb-3 text-xs font-semibold uppercase tracking-[0.18em] text-secondary">
+              Hoje no Estuda2
             </p>
-          )}
-        </div>
-        <div className="flex flex-wrap gap-2">
-          <Link
-            href="/sessoes"
-            className={cn(buttonVariants({ variant: "outline" }))}
-          >
-            <Plus aria-hidden="true" />
-            Sessão
-          </Link>
-          <Link href="/questoes" className={cn(buttonVariants())}>
-            <Plus aria-hidden="true" />
-            Questões
-          </Link>
+            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl">
+              Oi, {workspace.currentUser.name}.
+            </h1>
+            <p className="mt-3 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+              Você tem {todayPlanCount} atividade
+              {todayPlanCount === 1 ? "" : "s"} para hoje
+              {overduePlanCount > 0
+                ? ` e ${overduePlanCount} revisão${overduePlanCount === 1 ? "" : "ões"} atrasada${overduePlanCount === 1 ? "" : "s"}`
+                : ""}. Um passo pequeno já mantém a dupla em movimento.
+            </p>
+            <div className="mt-6 flex flex-wrap gap-2">
+              <Link href="/sessoes" className={cn(buttonVariants())}>
+                <Plus aria-hidden="true" />
+                Registrar estudo
+              </Link>
+              <Link
+                href="/questoes"
+                className={cn(buttonVariants({ variant: "secondary" }))}
+              >
+                <Plus aria-hidden="true" />
+                Registrar questões
+              </Link>
+              <Link
+                href="/planejamento"
+                className={cn(buttonVariants({ variant: "outline" }))}
+              >
+                <CalendarCheck2 aria-hidden="true" />
+                Planejar
+              </Link>
+            </div>
+          </div>
+          <div className="rounded-[1.75rem] bg-primary p-5 text-primary-foreground shadow-paper">
+            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary-foreground/70">
+              Objetivo atual
+            </p>
+            <h2 className="mt-3 text-2xl font-bold">{workspace.name}</h2>
+            <p className="mt-3 text-sm leading-6 text-primary-foreground/75">
+              Dois trajetos, um objetivo. O painel existe para responder: o que
+              fazemos agora?
+            </p>
+            {examCountdown && (
+              <p className="mt-5 inline-flex items-center gap-2 rounded-full bg-white/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+                <CalendarDays className="size-4" aria-hidden="true" />
+                {examCountdown}
+              </p>
+            )}
+          </div>
         </div>
       </section>
 
@@ -267,7 +308,7 @@ export default async function DashboardPage() {
           return (
             <article
               key={card.label}
-              className="rounded-2xl border bg-card p-5 shadow-sm"
+              className="rounded-[1.5rem] border bg-card/90 p-5 shadow-paper"
             >
               <div className="flex items-start justify-between gap-4">
                 <div>
@@ -293,7 +334,7 @@ export default async function DashboardPage() {
       </section>
 
       <section className="grid gap-4 lg:grid-cols-[1.45fr_1fr]">
-        <article className="min-h-72 rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+        <article className="min-h-72 rounded-[1.75rem] border bg-card/90 p-5 shadow-paper sm:p-6">
           <div className="flex items-center justify-between gap-4">
             <div>
               <h2 className="font-semibold">Ritmo dos últimos 7 dias</h2>
@@ -331,17 +372,17 @@ export default async function DashboardPage() {
           </div>
         </article>
 
-        <article className="rounded-2xl bg-slate-950 p-6 text-white shadow-sm">
+        <article className="rounded-[1.75rem] bg-primary p-6 text-primary-foreground shadow-soft">
           <div className="flex size-11 items-center justify-center rounded-xl bg-white/10">
-            <Target className="size-5 text-violet-300" aria-hidden="true" />
+            <Target className="size-5 text-primary-foreground" aria-hidden="true" />
           </div>
-          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-violet-300">
+          <p className="mt-6 text-xs font-semibold uppercase tracking-[0.16em] text-primary-foreground/70">
             Meta semanal da dupla
           </p>
           <h2 className="mt-2 text-xl font-semibold">
             {minutesToLabel(weeklyGoalMinutes)} em dupla
           </h2>
-          <p className="mt-3 text-sm leading-6 text-slate-300">
+          <p className="mt-3 text-sm leading-6 text-primary-foreground/75">
             Vocês já registraram {minutesToLabel(weekMinutes)}. Faltam{" "}
             {minutesToLabel(Math.max(0, weeklyGoalMinutes - weekMinutes))} para
             a meta.
@@ -359,7 +400,7 @@ export default async function DashboardPage() {
           </div>
           {personalGoalMinutes && (
             <div className="mt-5 border-t border-white/10 pt-5">
-              <div className="flex items-center justify-between gap-3 text-xs text-slate-300">
+              <div className="flex items-center justify-between gap-3 text-xs text-primary-foreground/75">
                 <span>Minha meta</span>
                 <span>
                   {minutesToLabel(personalMinutes)} /{" "}
@@ -389,7 +430,7 @@ export default async function DashboardPage() {
         </article>
       </section>
 
-      <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+      <section className="rounded-[1.75rem] border bg-card/90 p-5 shadow-paper sm:p-6">
         <div className="flex items-center justify-between gap-4">
           <div>
             <h2 className="font-semibold">Meu próximo passo</h2>
@@ -417,7 +458,7 @@ export default async function DashboardPage() {
               return (
                 <article
                   key={item.id}
-                  className="rounded-xl border bg-muted/25 p-4"
+                  className="rounded-2xl border bg-muted/35 p-4"
                 >
                   <div className="flex items-center gap-2">
                     <span
@@ -455,7 +496,7 @@ export default async function DashboardPage() {
         )}
       </section>
 
-      <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+      <section className="rounded-[1.75rem] border bg-card/90 p-5 shadow-paper sm:p-6">
         <h2 className="font-semibold">Atividade recente</h2>
         {recentActivity.length === 0 ? (
           <p className="mt-4 text-sm text-muted-foreground">

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Menu } from "lucide-react";
+import { Menu, Sparkles } from "lucide-react";
 
 import { AppLogo } from "@/components/app-logo";
 import { SidebarNavigation } from "@/components/sidebar-navigation";
@@ -28,8 +28,17 @@ export function MobileHeader({
   const [open, setOpen] = useState(false);
 
   return (
-    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-background/95 px-4 backdrop-blur md:hidden">
-      <AppLogo />
+    <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b bg-card/85 px-4 shadow-sm backdrop-blur md:hidden">
+      <div className="flex items-center gap-3">
+        <AppLogo compact />
+        <div className="leading-tight">
+          <p className="font-serif text-lg font-bold">Estuda2</p>
+          <p className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+            <Sparkles className="size-3 text-secondary" aria-hidden="true" />
+            Hoje · {currentUser.name}
+          </p>
+        </div>
+      </div>
       <Sheet open={open} onOpenChange={setOpen}>
         <SheetTrigger asChild>
           <Button

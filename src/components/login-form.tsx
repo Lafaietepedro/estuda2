@@ -39,7 +39,7 @@ export function LoginForm() {
       </label>
       <FormMessage state={state} />
       <SubmitButton className="w-full" pendingLabel="Entrando...">
-        Entrar
+        Entrar no meu espaço
       </SubmitButton>
     </form>
   );

@@ -14,12 +14,12 @@ export function PageHeading({
   action,
 }: PageHeadingProps) {
   return (
-    <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+    <header className="flex flex-col gap-4 rounded-3xl border bg-card/85 p-5 shadow-paper backdrop-blur sm:flex-row sm:items-end sm:justify-between sm:p-6">
       <div>
-        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-primary">
+        <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-secondary">
           {eyebrow}
         </p>
-        <h1 className="text-2xl font-bold tracking-tight sm:text-3xl">{title}</h1>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">{title}</h1>
         <p className="mt-2 max-w-2xl text-sm text-muted-foreground sm:text-base">
           {description}
         </p>
