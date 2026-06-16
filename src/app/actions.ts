@@ -111,7 +111,14 @@ const studySessionSchema = z.object({
     .min(1, "Informe pelo menos 1 minuto.")
     .max(1440, "A duração máxima é de 24 horas."),
   notes: z.string().trim().max(500, "Use no máximo 500 caracteres.").optional(),
+  autoReviews: z.enum(["on"]).optional(),
 });
+
+function addDays(date: Date, days: number) {
+  const nextDate = new Date(date);
+  nextDate.setUTCDate(nextDate.getUTCDate() + days);
+  return nextDate;
+}
 
 export async function createStudySession(
   _previousState: FormState,
@@ -123,19 +130,63 @@ export async function createStudySession(
   try {
     const workspace = await validateActiveSubject(parsed.data.subjectId);
     await validateTopicSelection(parsed.data.subjectId, parsed.data.topicId);
-    await prisma.studySession.create({
-      data: {
-        userId: workspace.currentUser.id,
-        subjectId: parsed.data.subjectId,
-        topicId: parsed.data.topicId,
-        examId: workspace.id,
-        studiedAt: parseLocalDate(parsed.data.studiedAt),
-        durationMinutes: parsed.data.durationMinutes,
-        notes: parsed.data.notes || null,
-      },
+    const studiedAt = parseLocalDate(parsed.data.studiedAt);
+    await prisma.$transaction(async (tx) => {
+      await tx.studySession.create({
+        data: {
+          userId: workspace.currentUser.id,
+          subjectId: parsed.data.subjectId,
+          topicId: parsed.data.topicId,
+          examId: workspace.id,
+          studiedAt,
+          durationMinutes: parsed.data.durationMinutes,
+          notes: parsed.data.notes || null,
+        },
+      });
+      if (parsed.data.autoReviews === "on") {
+        const subject = workspace.subjects.find(
+          (item) => item.id === parsed.data.subjectId,
+        );
+        const topic = parsed.data.topicId
+          ? await tx.topic.findFirst({
+              where: { id: parsed.data.topicId, examId: workspace.id },
+              include: { parent: true },
+            })
+          : null;
+        const targetName = topic
+          ? topic.parent
+            ? `${topic.parent.name} > ${topic.name}`
+            : topic.name
+          : subject?.name ?? "conteúdo estudado";
+        const reviewPlan = [
+          { days: 1, label: "1 dia" },
+          { days: 7, label: "7 dias" },
+          { days: 30, label: "30 dias" },
+        ];
+
+        await tx.studyPlanItem.createMany({
+          data: reviewPlan.map((review) => ({
+            kind: PlanItemKind.REVIEW,
+            title: `Revisar ${targetName}`,
+            scheduledFor: addDays(studiedAt, review.days),
+            estimatedMinutes: 30,
+            notes: `Revisão automática de ${review.label} gerada a partir da sessão de estudo.`,
+            userId: workspace.currentUser.id,
+            examId: workspace.id,
+            subjectId: parsed.data.subjectId,
+            topicId: parsed.data.topicId,
+          })),
+        });
+      }
     });
     revalidateRecords();
-    return { status: "success", message: "Sessão registrada." };
+    return {
+      status: "success",
+      message:
+        parsed.data.autoReviews === "on"
+          ? "Sessão registrada e revisões programadas."
+          : "Sessão registrada.",
+    };
   } catch {
     return {
       status: "error",

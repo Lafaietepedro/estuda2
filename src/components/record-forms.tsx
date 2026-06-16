@@ -135,6 +135,21 @@ export function StudySessionForm({
         <FieldError errors={state.errors} name="notes" />
       </label>
 
+      <label className="flex items-start gap-3 rounded-xl border bg-muted/30 p-4 text-sm">
+        <input
+          name="autoReviews"
+          type="checkbox"
+          defaultChecked
+          className="mt-1 size-4 rounded border-input"
+        />
+        <span>
+          <span className="font-medium">Criar revisões automáticas</span>
+          <span className="mt-1 block text-muted-foreground">
+            Programa revisões em 1, 7 e 30 dias para esta matéria ou tópico.
+          </span>
+        </span>
+      </label>
+
       <FormMessage state={state} />
       {subjects.length === 0 && (
         <p className="text-sm text-amber-700">
