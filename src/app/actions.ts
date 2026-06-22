@@ -32,6 +32,7 @@ import {
   timerNetSeconds,
   timerPauseSeconds,
 } from "@/lib/study-timer";
+import { ensureStudyTimerStorage } from "@/lib/study-timer-data";
 
 const idSchema = z.string().min(1, "Selecione uma opção.");
 const optionalIdSchema = z.preprocess(
@@ -195,6 +196,7 @@ export async function startStudyTimer(
   if (!parsed.success) return errorState(parsed.error);
 
   try {
+    await ensureStudyTimerStorage();
     const workspace = await validateActiveSubject(parsed.data.subjectId);
     await validateTopicSelection(parsed.data.subjectId, parsed.data.topicId);
     const activeTimer = await prisma.studyTimer.findFirst({
@@ -234,6 +236,7 @@ const timerIdSchema = z.object({
 });
 
 async function getOwnedTimer(id: string) {
+  await ensureStudyTimerStorage();
   const workspace = await getWorkspace();
   const timer = await prisma.studyTimer.findFirst({
     where: {

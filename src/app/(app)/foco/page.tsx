@@ -5,10 +5,7 @@ import { PageHeading } from "@/components/page-heading";
 import { getWorkspace } from "@/lib/data";
 import { prisma } from "@/lib/prisma";
 import { reviewIntervalsSummary } from "@/lib/reviews";
-import {
-  findActiveStudyTimer,
-  studyTimerStorageReady,
-} from "@/lib/study-timer-data";
+import { findActiveStudyTimer } from "@/lib/study-timer-data";
 
 export const metadata = {
   title: "Modo Foco",
@@ -18,12 +15,11 @@ export const dynamic = "force-dynamic";
 
 export default async function FocusPage() {
   const workspace = await getWorkspace();
-  const [activeTimer, timerStorageReady, topics] = await Promise.all([
+  const [activeTimer, topics] = await Promise.all([
     findActiveStudyTimer({
       examId: workspace.id,
       userId: workspace.currentUser.id,
     }),
-    studyTimerStorageReady(),
     prisma.topic.findMany({
       where: { examId: workspace.id },
       orderBy: [
@@ -55,13 +51,6 @@ export default async function FocusPage() {
         title="Modo Foco"
         description="Escolha o que vai estudar, acompanhe o tempo líquido e salve a sessão apenas quando revisar o resumo."
       />
-
-      {!timerStorageReady && (
-        <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
-          O Modo Foco precisa da atualização mais recente do banco. Execute as
-          migrations ou sincronize o Prisma para liberar o timer.
-        </div>
-      )}
 
       {activeTimer ? (
         <ActiveFocusTimer
