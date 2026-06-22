@@ -3,7 +3,12 @@
 import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { ExamRole, PlanItemKind, Prisma } from "@prisma/client";
+import {
+  ExamRole,
+  PlanItemKind,
+  Prisma,
+  StudyTimerStatus,
+} from "@prisma/client";
 import { z } from "zod";
 
 import { getWorkspace } from "@/lib/data";
@@ -22,6 +27,12 @@ import {
   SESSION_COOKIE,
   sessionCookieOptions,
 } from "@/lib/session";
+import {
+  secondsBetween,
+  secondsToRoundedMinutes,
+  timerNetSeconds,
+  timerPauseSeconds,
+} from "@/lib/study-timer";
 
 const idSchema = z.string().min(1, "Selecione uma opção.");
 const optionalIdSchema = z.preprocess(
@@ -82,6 +93,7 @@ function revalidateRecords() {
   revalidatePath("/comparativo");
   revalidatePath("/planejamento");
   revalidatePath("/edital");
+  revalidatePath("/foco");
 }
 
 async function requireOwner() {
@@ -123,6 +135,277 @@ async function validateTopicSelection(
   }
 
   return topic;
+}
+
+type Workspace = Awaited<ReturnType<typeof getWorkspace>>;
+
+async function createAutomaticReviewItems(
+  tx: Prisma.TransactionClient,
+  workspace: Workspace,
+  data: {
+    studiedAt: Date;
+    subjectId: string;
+    topicId: string | null;
+  },
+) {
+  const subject = workspace.subjects.find(
+    (item) => item.id === data.subjectId,
+  );
+  const topic = data.topicId
+    ? await tx.topic.findFirst({
+        where: { id: data.topicId, examId: workspace.id },
+        include: { parent: true },
+      })
+    : null;
+  const targetName = topic
+    ? topic.parent
+      ? `${topic.parent.name} > ${topic.name}`
+      : topic.name
+    : subject?.name ?? "conteúdo estudado";
+  const reviewPlan = parseReviewIntervals(workspace.reviewIntervals);
+
+  await tx.studyPlanItem.createMany({
+    data: reviewPlan.map((days) => ({
+      kind: PlanItemKind.REVIEW,
+      title: `Revisar ${targetName}`,
+      scheduledFor: addDays(data.studiedAt, days),
+      estimatedMinutes: workspace.reviewMinutes,
+      notes: `Revisão automática de ${reviewIntervalLabel(days)} gerada a partir da sessão de estudo.`,
+      userId: workspace.currentUser.id,
+      examId: workspace.id,
+      subjectId: data.subjectId,
+      topicId: data.topicId,
+    })),
+  });
+}
+
+const activeTimerStatuses = [
+  StudyTimerStatus.RUNNING,
+  StudyTimerStatus.PAUSED,
+];
+
+function isActiveTimerStatus(status: StudyTimerStatus) {
+  return (
+    status === StudyTimerStatus.RUNNING || status === StudyTimerStatus.PAUSED
+  );
+}
+
+const startStudyTimerSchema = z.object({
+  subjectId: idSchema,
+  topicId: optionalIdSchema,
+  autoReviews: z.enum(["on"]).optional(),
+});
+
+export async function startStudyTimer(
+  _previousState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const parsed = startStudyTimerSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return errorState(parsed.error);
+
+  try {
+    const workspace = await validateActiveSubject(parsed.data.subjectId);
+    await validateTopicSelection(parsed.data.subjectId, parsed.data.topicId);
+    const activeTimer = await prisma.studyTimer.findFirst({
+      where: {
+        userId: workspace.currentUser.id,
+        status: { in: [...activeTimerStatuses] },
+      },
+      select: { id: true },
+    });
+    if (!activeTimer) {
+      const now = new Date();
+      await prisma.studyTimer.create({
+        data: {
+          userId: workspace.currentUser.id,
+          examId: workspace.id,
+          subjectId: parsed.data.subjectId,
+          topicId: parsed.data.topicId,
+          startedAt: now,
+          lastResumedAt: now,
+          createReviews: parsed.data.autoReviews === "on",
+        },
+      });
+    }
+  } catch {
+    return {
+      status: "error",
+      message: "Não foi possível iniciar a sessão. Confira a matéria escolhida.",
+    };
+  }
+
+  revalidateRecords();
+  redirect("/foco");
+}
+
+const timerIdSchema = z.object({
+  id: z.string().min(1),
+});
+
+async function getOwnedTimer(id: string) {
+  const workspace = await getWorkspace();
+  const timer = await prisma.studyTimer.findFirst({
+    where: {
+      id,
+      userId: workspace.currentUser.id,
+      examId: workspace.id,
+    },
+  });
+
+  return { workspace, timer };
+}
+
+export async function pauseStudyTimer(formData: FormData) {
+  const parsed = timerIdSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  const { timer } = await getOwnedTimer(parsed.data.id);
+  if (!timer || timer.status !== StudyTimerStatus.RUNNING) return;
+
+  const now = new Date();
+  await prisma.studyTimer.update({
+    where: { id: timer.id },
+    data: {
+      status: StudyTimerStatus.PAUSED,
+      pausedAt: now,
+      accumulatedSeconds: {
+        increment: secondsBetween(timer.lastResumedAt, now),
+      },
+    },
+  });
+  revalidateRecords();
+}
+
+export async function resumeStudyTimer(formData: FormData) {
+  const parsed = timerIdSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  const { timer } = await getOwnedTimer(parsed.data.id);
+  if (!timer || timer.status !== StudyTimerStatus.PAUSED) return;
+
+  const now = new Date();
+  await prisma.studyTimer.update({
+    where: { id: timer.id },
+    data: {
+      status: StudyTimerStatus.RUNNING,
+      pausedAt: null,
+      lastResumedAt: now,
+      pauseSeconds: {
+        increment: timer.pausedAt ? secondsBetween(timer.pausedAt, now) : 0,
+      },
+    },
+  });
+  revalidateRecords();
+}
+
+const finishStudyTimerSchema = timerIdSchema.extend({
+  notes: z.string().trim().max(500, "Use no máximo 500 caracteres.").optional(),
+  autoReviews: z.enum(["on"]).optional(),
+});
+
+export async function finishStudyTimer(
+  _previousState: FormState,
+  formData: FormData,
+): Promise<FormState> {
+  const parsed = finishStudyTimerSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return errorState(parsed.error);
+
+  try {
+    const { workspace, timer } = await getOwnedTimer(parsed.data.id);
+    if (!timer || !isActiveTimerStatus(timer.status)) {
+      throw new Error("Sessão em andamento não encontrada.");
+    }
+
+    const now = new Date();
+    const accumulatedSeconds = timerNetSeconds(timer, now);
+    const pauseSeconds = timerPauseSeconds(timer, now);
+    if (accumulatedSeconds < 60) {
+      return {
+        status: "error",
+        message:
+          "O tempo líquido ficou abaixo de 1 minuto. Descarte a sessão ou continue estudando.",
+      };
+    }
+
+    const durationMinutes = secondsToRoundedMinutes(accumulatedSeconds);
+    if (durationMinutes > 1440) {
+      return {
+        status: "error",
+        message:
+          "A duração final passou de 24 horas. Descarte esta sessão e registre manualmente.",
+      };
+    }
+
+    await prisma.$transaction(async (tx) => {
+      const updated = await tx.studyTimer.updateMany({
+        where: {
+          id: timer.id,
+          userId: workspace.currentUser.id,
+          status: { in: [...activeTimerStatuses] },
+        },
+        data: {
+          status: StudyTimerStatus.FINISHED,
+          finishedAt: now,
+          accumulatedSeconds,
+          pauseSeconds,
+          notes: parsed.data.notes || null,
+          createReviews: parsed.data.autoReviews === "on",
+          pausedAt:
+            timer.status === StudyTimerStatus.PAUSED ? timer.pausedAt : null,
+        },
+      });
+      if (updated.count !== 1) throw new Error("Sessão já finalizada.");
+
+      await tx.studySession.create({
+        data: {
+          userId: workspace.currentUser.id,
+          examId: workspace.id,
+          subjectId: timer.subjectId,
+          topicId: timer.topicId,
+          studiedAt: timer.startedAt,
+          durationMinutes,
+          notes: parsed.data.notes || null,
+        },
+      });
+
+      if (parsed.data.autoReviews === "on") {
+        await createAutomaticReviewItems(tx, workspace, {
+          studiedAt: timer.startedAt,
+          subjectId: timer.subjectId,
+          topicId: timer.topicId,
+        });
+      }
+    });
+  } catch {
+    return {
+      status: "error",
+      message: "Não foi possível salvar a sessão. Tente novamente.",
+    };
+  }
+
+  revalidateRecords();
+  redirect("/sessoes");
+}
+
+export async function cancelStudyTimer(formData: FormData) {
+  const parsed = timerIdSchema.safeParse(Object.fromEntries(formData));
+  if (!parsed.success) return;
+
+  const { workspace, timer } = await getOwnedTimer(parsed.data.id);
+  if (!timer || !isActiveTimerStatus(timer.status)) return;
+
+  await prisma.studyTimer.updateMany({
+    where: {
+      id: timer.id,
+      userId: workspace.currentUser.id,
+      status: { in: [...activeTimerStatuses] },
+    },
+    data: {
+      status: StudyTimerStatus.CANCELLED,
+      finishedAt: new Date(),
+    },
+  });
+  revalidateRecords();
 }
 
 const studySessionSchema = z.object({
@@ -553,7 +836,7 @@ export async function createSubject(
   if (!parsed.success) return errorState(parsed.error);
 
   try {
-    const workspace = await requireOwner();
+    const workspace = await getWorkspace();
     const lastPosition = Math.max(
       0,
       ...workspace.subjects.map((subject) => subject.position),
@@ -572,7 +855,7 @@ export async function createSubject(
   } catch {
     return {
       status: "error",
-      message: "Essa matéria já existe ou você não pode adicioná-la.",
+      message: "Essa matéria já existe ou não foi possível adicioná-la.",
     };
   }
 }

@@ -5,8 +5,8 @@ import { usePathname } from "next/navigation";
 import {
   BarChart3,
   CalendarCheck2,
+  Focus,
   Home,
-  LibraryBig,
   Plus,
 } from "lucide-react";
 
@@ -16,8 +16,8 @@ const items = [
   { label: "Hoje", href: "/", icon: Home },
   { label: "Planejar", href: "/planejamento", icon: CalendarCheck2 },
   { label: "Registrar", href: "/sessoes", icon: Plus, featured: true },
+  { label: "Foco", href: "/foco", icon: Focus },
   { label: "Relatórios", href: "/relatorios", icon: BarChart3 },
-  { label: "Mais", href: "/materias", icon: LibraryBig },
 ];
 
 export function BottomNavigation() {

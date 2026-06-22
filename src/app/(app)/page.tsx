@@ -1,4 +1,5 @@
 import Link from "next/link";
+import { StudyTimerStatus } from "@prisma/client";
 import {
   ArrowUpRight,
   BookOpen,
@@ -7,11 +8,15 @@ import {
   CircleCheck,
   Clock3,
   Flame,
+  Focus,
+  Pause,
   Plus,
+  RotateCcw,
   Settings,
   Target,
 } from "lucide-react";
 
+import { pauseStudyTimer, resumeStudyTimer } from "@/app/actions";
 import { buttonVariants } from "@/components/ui/button";
 import { getWorkspace } from "@/lib/data";
 import {
@@ -22,6 +27,7 @@ import {
   startOfCurrentWeek,
 } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
+import { secondsToHuman, timerNetSeconds } from "@/lib/study-timer";
 import { cn } from "@/lib/utils";
 
 export const dynamic = "force-dynamic";
@@ -41,6 +47,7 @@ export default async function DashboardPage() {
   sevenDaysAgo.setUTCDate(sevenDaysAgo.getUTCDate() - 6);
 
   const [
+    activeTimer,
     weekSessions,
     weekQuestions,
     recentSessions,
@@ -49,64 +56,72 @@ export default async function DashboardPage() {
     todayPlanCount,
     overduePlanCount,
   ] = await Promise.all([
-      prisma.studySession.findMany({
-        where: { examId: workspace.id, studiedAt: { gte: sevenDaysAgo } },
-        select: { durationMinutes: true, studiedAt: true, userId: true },
-      }),
-      prisma.questionLog.findMany({
-        where: { examId: workspace.id, answeredAt: { gte: weekStart } },
-        select: {
-          questionsAnswered: true,
-          correctAnswers: true,
-          userId: true,
+    prisma.studyTimer.findFirst({
+      where: {
+        examId: workspace.id,
+        userId: workspace.currentUser.id,
+        status: {
+          in: [StudyTimerStatus.RUNNING, StudyTimerStatus.PAUSED],
         },
-      }),
-      prisma.studySession.findMany({
-        where: { examId: workspace.id },
-        orderBy: [{ studiedAt: "desc" }, { createdAt: "desc" }],
-        take: 4,
-        include: { user: true, subject: true },
-      }),
-      prisma.questionLog.findMany({
-        where: { examId: workspace.id },
-        orderBy: [{ answeredAt: "desc" }, { createdAt: "desc" }],
-        take: 4,
-        include: { user: true, subject: true },
-      }),
-      prisma.studyPlanItem.findMany({
-        where: {
-          examId: workspace.id,
-          userId: workspace.currentUser.id,
-          completedAt: null,
-        },
-        orderBy: [{ scheduledFor: "asc" }, { createdAt: "asc" }],
-        take: 4,
-        include: { subject: true, topic: { include: { parent: true } } },
-      }),
-      prisma.studyPlanItem.count({
-        where: {
-          examId: workspace.id,
-          userId: workspace.currentUser.id,
-          completedAt: null,
-          scheduledFor: today,
-        },
-      }),
-      prisma.studyPlanItem.count({
-        where: {
-          examId: workspace.id,
-          userId: workspace.currentUser.id,
-          completedAt: null,
-          scheduledFor: { lt: today },
-        },
-      }),
-    ]);
+      },
+      orderBy: { startedAt: "desc" },
+      include: { subject: true, topic: { include: { parent: true } } },
+    }),
+    prisma.studySession.findMany({
+      where: { examId: workspace.id, studiedAt: { gte: sevenDaysAgo } },
+      select: { durationMinutes: true, studiedAt: true, userId: true },
+    }),
+    prisma.questionLog.findMany({
+      where: { examId: workspace.id, answeredAt: { gte: weekStart } },
+      select: {
+        questionsAnswered: true,
+        correctAnswers: true,
+        userId: true,
+      },
+    }),
+    prisma.studySession.findMany({
+      where: { examId: workspace.id },
+      orderBy: [{ studiedAt: "desc" }, { createdAt: "desc" }],
+      take: 4,
+      include: { user: true, subject: true },
+    }),
+    prisma.questionLog.findMany({
+      where: { examId: workspace.id },
+      orderBy: [{ answeredAt: "desc" }, { createdAt: "desc" }],
+      take: 4,
+      include: { user: true, subject: true },
+    }),
+    prisma.studyPlanItem.findMany({
+      where: {
+        examId: workspace.id,
+        userId: workspace.currentUser.id,
+        completedAt: null,
+      },
+      orderBy: [{ scheduledFor: "asc" }, { createdAt: "asc" }],
+      take: 4,
+      include: { subject: true, topic: { include: { parent: true } } },
+    }),
+    prisma.studyPlanItem.count({
+      where: {
+        examId: workspace.id,
+        userId: workspace.currentUser.id,
+        completedAt: null,
+        scheduledFor: today,
+      },
+    }),
+    prisma.studyPlanItem.count({
+      where: {
+        examId: workspace.id,
+        userId: workspace.currentUser.id,
+        completedAt: null,
+        scheduledFor: { lt: today },
+      },
+    }),
+  ]);
 
   const weekMinutes = weekSessions
     .filter((session) => session.studiedAt >= weekStart)
-    .reduce(
-    (total, session) => total + session.durationMinutes,
-    0,
-    );
+    .reduce((total, session) => total + session.durationMinutes, 0);
   const questionsAnswered = weekQuestions.reduce(
     (total, log) => total + log.questionsAnswered,
     0,
@@ -266,6 +281,68 @@ export default async function DashboardPage() {
             <Settings aria-hidden="true" />
             Abrir configurações
           </Link>
+        </section>
+      )}
+
+      {activeTimer && (
+        <section className="rounded-[1.75rem] border border-primary/20 bg-primary/10 p-5 shadow-paper sm:flex sm:items-center sm:justify-between sm:gap-6">
+          <div className="flex items-start gap-3">
+            <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
+              <Focus className="size-5" aria-hidden="true" />
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                Sessão em andamento
+              </p>
+              <h2 className="mt-1 text-xl font-bold">
+                {activeTimer.subject.name}
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                Tempo líquido:{" "}
+                <strong>{secondsToHuman(timerNetSeconds(activeTimer))}</strong>{" "}
+                ·{" "}
+                {activeTimer.status === StudyTimerStatus.RUNNING
+                  ? "Em foco"
+                  : "Pausada"}
+                {activeTimer.topic
+                  ? ` · ${
+                      activeTimer.topic.parent
+                        ? `${activeTimer.topic.parent.name} > ${activeTimer.topic.name}`
+                        : activeTimer.topic.name
+                    }`
+                  : ""}
+              </p>
+            </div>
+          </div>
+          <div className="mt-4 flex flex-wrap gap-2 sm:mt-0">
+            <Link href="/foco" className={cn(buttonVariants())}>
+              Continuar
+              <ArrowUpRight aria-hidden="true" />
+            </Link>
+            {activeTimer.status === StudyTimerStatus.RUNNING ? (
+              <form action={pauseStudyTimer}>
+                <input type="hidden" name="id" value={activeTimer.id} />
+                <button
+                  type="submit"
+                  className={cn(buttonVariants({ variant: "secondary" }))}
+                >
+                  <Pause aria-hidden="true" />
+                  Pausar
+                </button>
+              </form>
+            ) : (
+              <form action={resumeStudyTimer}>
+                <input type="hidden" name="id" value={activeTimer.id} />
+                <button
+                  type="submit"
+                  className={cn(buttonVariants({ variant: "secondary" }))}
+                >
+                  <RotateCcw aria-hidden="true" />
+                  Retomar
+                </button>
+              </form>
+            )}
+          </div>
         </section>
       )}
 

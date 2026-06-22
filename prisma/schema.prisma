@@ -17,6 +17,17 @@ enum PlanItemKind {
   REVIEW
 }
 
+enum StudyTimerStatus {
+  RUNNING
+  PAUSED
+  FINISHED
+  CANCELLED
+}
+
+enum StudyTimerMode {
+  FREE
+}
+
 model User {
   id             String           @id @default(cuid())
   name           String
@@ -29,6 +40,7 @@ model User {
   studySessions  StudySession[]
   questionLogs   QuestionLog[]
   studyPlanItems StudyPlanItem[]
+  studyTimers    StudyTimer[]
 }
 
 model Exam {
@@ -48,6 +60,7 @@ model Exam {
   questionLogs      QuestionLog[]
   studyPlanItems    StudyPlanItem[]
   topics            Topic[]
+  studyTimers       StudyTimer[]
 }
 
 model ExamMembership {
@@ -79,9 +92,39 @@ model Subject {
   questionLogs      QuestionLog[]
   studyPlanItems    StudyPlanItem[]
   topics            Topic[]
+  studyTimers       StudyTimer[]
 
   @@unique([examId, name])
   @@index([examId])
+}
+
+model StudyTimer {
+  id                 String           @id @default(cuid())
+  mode               StudyTimerMode   @default(FREE)
+  status             StudyTimerStatus @default(RUNNING)
+  startedAt          DateTime
+  lastResumedAt      DateTime
+  pausedAt           DateTime?
+  finishedAt         DateTime?
+  accumulatedSeconds Int              @default(0)
+  pauseSeconds       Int              @default(0)
+  notes              String?
+  createReviews      Boolean          @default(true)
+  userId             String
+  examId             String
+  subjectId          String
+  topicId            String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  user               User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  exam               Exam             @relation(fields: [examId], references: [id], onDelete: Cascade)
+  subject            Subject          @relation(fields: [subjectId], references: [id], onDelete: Restrict)
+  topic              Topic?           @relation(fields: [topicId], references: [id], onDelete: SetNull)
+
+  @@index([userId, status])
+  @@index([examId, status])
+  @@index([subjectId])
+  @@index([topicId])
 }
 
 model StudySession {
@@ -172,6 +215,7 @@ model Topic {
   studySessions  StudySession[]
   questionLogs   QuestionLog[]
   studyPlanItems StudyPlanItem[]
+  studyTimers    StudyTimer[]
 
   @@index([examId])
   @@index([subjectId, parentId, position])

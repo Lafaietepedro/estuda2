@@ -251,18 +251,16 @@ export default async function SubjectsPage() {
         description="Organize o plano da dupla sem perder o histórico das disciplinas encerradas."
       />
 
-      {isOwner ? (
-        <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
-          <h2 className="text-lg font-semibold">Adicionar matéria</h2>
-          <div className="mt-5">
-            <SubjectForm />
-          </div>
-        </section>
-      ) : (
-        <div className="rounded-2xl border bg-card p-4 text-sm text-muted-foreground">
-          Apenas o responsável pelo espaço pode alterar matérias e metas.
+      <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+        <h2 className="text-lg font-semibold">Adicionar matéria</h2>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Qualquer pessoa da dupla pode adicionar novas matérias ao plano.
+          Edição, ordenação e arquivamento continuam com o responsável.
+        </p>
+        <div className="mt-5">
+          <SubjectForm />
         </div>
-      )}
+      </section>
 
       <section>
         <h2 className="mb-4 text-lg font-semibold">Matérias ativas</h2>

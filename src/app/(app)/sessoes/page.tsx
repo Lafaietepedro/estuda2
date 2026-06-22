@@ -1,4 +1,5 @@
-import { Pencil, Trash2 } from "lucide-react";
+import Link from "next/link";
+import { Pencil, Play, Trash2 } from "lucide-react";
 import type { Prisma } from "@prisma/client";
 
 import { deleteStudySession } from "@/app/actions";
@@ -19,6 +20,8 @@ import {
 import { formatDate, formatDateInput, minutesToLabel } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
 import { reviewIntervalsSummary } from "@/lib/reviews";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 export const metadata = {
   title: "Sessões",
@@ -94,11 +97,23 @@ export default async function SessionsPage({
       />
 
       <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
-        <h2 className="text-lg font-semibold">Nova sessão</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          O registro será vinculado automaticamente a{" "}
-          <strong>{workspace.currentUser.name}</strong>.
-        </p>
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h2 className="text-lg font-semibold">Nova sessão</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Registre manualmente ou inicie uma sessão com relógio. O registro
+              será vinculado automaticamente a{" "}
+              <strong>{workspace.currentUser.name}</strong>.
+            </p>
+          </div>
+          <Link
+            href="/foco"
+            className={cn(buttonVariants({ variant: "secondary" }), "shrink-0")}
+          >
+            <Play aria-hidden="true" />
+            Iniciar com relógio
+          </Link>
+        </div>
         <div className="mt-5">
           <StudySessionForm
             subjects={activeSubjects}
