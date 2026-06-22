@@ -15,7 +15,6 @@ export async function AppShell({ children }: AppShellProps) {
     examName: workspace.name,
     currentUser: {
       name: workspace.currentUser.name,
-      role: workspace.currentMembership.role,
     },
     users: workspace.memberships.map((membership) => ({
       id: membership.user.id,

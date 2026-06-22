@@ -188,58 +188,56 @@ export default async function SessionsPage({
                     )}
                   </div>
                 </div>
-                {session.userId === workspace.currentUser.id && (
-                  <div className="flex items-center gap-1 self-end sm:self-auto">
-                    <details className="group">
-                      <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
-                        <Pencil className="size-4" aria-hidden="true" />
-                        <span className="sr-only">Editar sessão</span>
-                      </summary>
-                      <div className="mt-3 rounded-xl border bg-muted/30 p-4 sm:absolute sm:right-10 sm:z-20 sm:w-[32rem] sm:bg-card sm:shadow-xl">
-                        <StudySessionEditForm
-                          session={{
-                            id: session.id,
-                            subjectId: session.subjectId,
-                            topicId: session.topicId ?? "",
-                            studiedAt: formatDateInput(session.studiedAt),
-                            durationMinutes: session.durationMinutes,
-                            notes: session.notes ?? "",
-                          }}
-                          subjects={workspace.subjects.filter(
-                            (subject) =>
-                              !subject.archivedAt ||
-                              subject.id === session.subjectId,
-                          )}
-                          topics={topics
-                            .filter(
-                              (topic) =>
-                                !topic.archivedAt ||
-                                topic.id === session.topicId,
-                            )
-                            .map((topic) => ({
-                              id: topic.id,
-                              name: topic.name,
-                              subjectId: topic.subjectId,
-                              subjectName: topic.subject.name,
-                              parentName: topic.parent?.name ?? null,
-                            }))}
-                        />
-                      </div>
-                    </details>
-                    <form action={deleteStudySession}>
-                      <input type="hidden" name="id" value={session.id} />
-                      <ConfirmSubmitButton
-                        variant="ghost"
-                        size="icon"
-                        aria-label="Excluir sessão"
-                        className="text-muted-foreground hover:text-destructive"
-                        confirmMessage="Excluir esta sessão de estudo? Essa ação não pode ser desfeita."
-                      >
-                        <Trash2 aria-hidden="true" />
-                      </ConfirmSubmitButton>
-                    </form>
-                  </div>
-                )}
+                <div className="flex items-center gap-1 self-end sm:self-auto">
+                  <details className="group">
+                    <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
+                      <Pencil className="size-4" aria-hidden="true" />
+                      <span className="sr-only">Editar sessão</span>
+                    </summary>
+                    <div className="mt-3 rounded-xl border bg-muted/30 p-4 sm:absolute sm:right-10 sm:z-20 sm:w-[32rem] sm:bg-card sm:shadow-xl">
+                      <StudySessionEditForm
+                        session={{
+                          id: session.id,
+                          subjectId: session.subjectId,
+                          topicId: session.topicId ?? "",
+                          studiedAt: formatDateInput(session.studiedAt),
+                          durationMinutes: session.durationMinutes,
+                          notes: session.notes ?? "",
+                        }}
+                        subjects={workspace.subjects.filter(
+                          (subject) =>
+                            !subject.archivedAt ||
+                            subject.id === session.subjectId,
+                        )}
+                        topics={topics
+                          .filter(
+                            (topic) =>
+                              !topic.archivedAt ||
+                              topic.id === session.topicId,
+                          )
+                          .map((topic) => ({
+                            id: topic.id,
+                            name: topic.name,
+                            subjectId: topic.subjectId,
+                            subjectName: topic.subject.name,
+                            parentName: topic.parent?.name ?? null,
+                          }))}
+                      />
+                    </div>
+                  </details>
+                  <form action={deleteStudySession}>
+                    <input type="hidden" name="id" value={session.id} />
+                    <ConfirmSubmitButton
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Excluir sessão"
+                      className="text-muted-foreground hover:text-destructive"
+                      confirmMessage="Excluir esta sessão de estudo? Essa ação não pode ser desfeita."
+                    >
+                      <Trash2 aria-hidden="true" />
+                    </ConfirmSubmitButton>
+                  </form>
+                </div>
               </article>
             ))}
           </div>

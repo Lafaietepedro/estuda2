@@ -43,11 +43,10 @@ export default async function PlanningPage() {
   const items = await prisma.studyPlanItem.findMany({
     where: {
       examId: workspace.id,
-      userId: workspace.currentUser.id,
     },
     orderBy: [{ completedAt: "asc" }, { scheduledFor: "asc" }],
     take: 250,
-    include: { subject: true, topic: { include: { parent: true } } },
+    include: { user: true, subject: true, topic: { include: { parent: true } } },
   });
   const topics = await prisma.topic.findMany({
     where: { examId: workspace.id },
@@ -137,7 +136,7 @@ export default async function PlanningPage() {
             </h3>
             <p className="mt-1 text-sm text-muted-foreground">
               {formatDate(item.scheduledFor)} ·{" "}
-              {minutesToLabel(item.estimatedMinutes)}
+              {minutesToLabel(item.estimatedMinutes)} · por {item.user.name}
             </p>
             {item.topic && (
               <p className="mt-1 text-xs font-medium text-muted-foreground">
@@ -224,7 +223,7 @@ export default async function PlanningPage() {
       <PageHeading
         eyebrow="Organização"
         title="Planejamento"
-        description="Organize seus próximos estudos e revisões sem misturar a agenda da outra pessoa."
+        description="Organize os próximos estudos e revisões da dupla, com cada atividade identificada por pessoa."
       />
 
       <section className="grid gap-4 sm:grid-cols-3">

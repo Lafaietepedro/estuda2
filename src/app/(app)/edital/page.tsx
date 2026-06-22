@@ -7,7 +7,6 @@ import {
   RotateCcw,
   Trash2,
 } from "lucide-react";
-import { ExamRole } from "@prisma/client";
 
 import {
   deleteTopic,
@@ -31,7 +30,6 @@ export const dynamic = "force-dynamic";
 
 export default async function SyllabusPage() {
   const workspace = await getWorkspace();
-  const isOwner = workspace.currentMembership.role === ExamRole.OWNER;
   const [topics, sessionTotals, questionTotals, planTotals] =
     await Promise.all([
       prisma.topic.findMany({
@@ -175,36 +173,34 @@ export default async function SyllabusPage() {
             )}
           </div>
 
-          {isOwner && (
-            <div className="flex shrink-0 items-center">
-              <form action={reorderTopic}>
-                <input type="hidden" name="id" value={topic.id} />
-                <input type="hidden" name="direction" value="up" />
-                <Button
-                  type="submit"
-                  variant="ghost"
-                  size="icon"
-                  disabled={index === 0}
-                  aria-label="Mover tópico para cima"
-                >
-                  <ArrowUp aria-hidden="true" />
-                </Button>
-              </form>
-              <form action={reorderTopic}>
-                <input type="hidden" name="id" value={topic.id} />
-                <input type="hidden" name="direction" value="down" />
-                <Button
-                  type="submit"
-                  variant="ghost"
-                  size="icon"
-                  disabled={index === listLength - 1}
-                  aria-label="Mover tópico para baixo"
-                >
-                  <ArrowDown aria-hidden="true" />
-                </Button>
-              </form>
-            </div>
-          )}
+          <div className="flex shrink-0 items-center">
+            <form action={reorderTopic}>
+              <input type="hidden" name="id" value={topic.id} />
+              <input type="hidden" name="direction" value="up" />
+              <Button
+                type="submit"
+                variant="ghost"
+                size="icon"
+                disabled={index === 0}
+                aria-label="Mover tópico para cima"
+              >
+                <ArrowUp aria-hidden="true" />
+              </Button>
+            </form>
+            <form action={reorderTopic}>
+              <input type="hidden" name="id" value={topic.id} />
+              <input type="hidden" name="direction" value="down" />
+              <Button
+                type="submit"
+                variant="ghost"
+                size="icon"
+                disabled={index === listLength - 1}
+                aria-label="Mover tópico para baixo"
+              >
+                <ArrowDown aria-hidden="true" />
+              </Button>
+            </form>
+          </div>
         </div>
 
         <dl className="mt-5 grid grid-cols-2 gap-4 sm:grid-cols-4">
@@ -226,55 +222,53 @@ export default async function SyllabusPage() {
           </div>
         </dl>
 
-        {isOwner && (
-          <div className="mt-5 flex flex-wrap items-center gap-1 border-t pt-4">
-            <details className="group flex-1">
-              <summary className="flex h-9 cursor-pointer list-none items-center justify-center gap-2 rounded-md px-3 text-sm font-medium hover:bg-accent">
-                <Pencil className="size-4" aria-hidden="true" />
-                Editar
-              </summary>
-              <div className="mt-3 rounded-xl border bg-muted/30 p-4">
-                <TopicEditForm
-                  topic={{
-                    id: topic.id,
-                    name: topic.name,
-                    description: topic.description ?? "",
-                  }}
-                />
-              </div>
-            </details>
-            <form action={toggleTopicArchive}>
-              <input type="hidden" name="id" value={topic.id} />
-              <input
-                type="hidden"
-                name="archived"
-                value={topic.archivedAt ? "false" : "true"}
+        <div className="mt-5 flex flex-wrap items-center gap-1 border-t pt-4">
+          <details className="group flex-1">
+            <summary className="flex h-9 cursor-pointer list-none items-center justify-center gap-2 rounded-md px-3 text-sm font-medium hover:bg-accent">
+              <Pencil className="size-4" aria-hidden="true" />
+              Editar
+            </summary>
+            <div className="mt-3 rounded-xl border bg-muted/30 p-4">
+              <TopicEditForm
+                topic={{
+                  id: topic.id,
+                  name: topic.name,
+                  description: topic.description ?? "",
+                }}
               />
-              <Button type="submit" variant="ghost" size="sm">
-                {topic.archivedAt ? (
-                  <RotateCcw aria-hidden="true" />
-                ) : (
-                  <Archive aria-hidden="true" />
-                )}
-                {topic.archivedAt ? "Reativar" : "Arquivar"}
-              </Button>
+            </div>
+          </details>
+          <form action={toggleTopicArchive}>
+            <input type="hidden" name="id" value={topic.id} />
+            <input
+              type="hidden"
+              name="archived"
+              value={topic.archivedAt ? "false" : "true"}
+            />
+            <Button type="submit" variant="ghost" size="sm">
+              {topic.archivedAt ? (
+                <RotateCcw aria-hidden="true" />
+              ) : (
+                <Archive aria-hidden="true" />
+              )}
+              {topic.archivedAt ? "Reativar" : "Arquivar"}
+            </Button>
+          </form>
+          {historyCount === 0 && (
+            <form action={deleteTopic}>
+              <input type="hidden" name="id" value={topic.id} />
+              <ConfirmSubmitButton
+                variant="ghost"
+                size="icon"
+                aria-label="Excluir tópico sem histórico"
+                className="text-muted-foreground hover:text-destructive"
+                confirmMessage={`Excluir definitivamente o tópico ${topic.name}?`}
+              >
+                <Trash2 aria-hidden="true" />
+              </ConfirmSubmitButton>
             </form>
-            {historyCount === 0 && (
-              <form action={deleteTopic}>
-                <input type="hidden" name="id" value={topic.id} />
-                <ConfirmSubmitButton
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Excluir tópico sem histórico"
-                  className="text-muted-foreground hover:text-destructive"
-                  confirmMessage={`Excluir definitivamente o tópico ${topic.name}?`}
-                >
-                  <Trash2 aria-hidden="true" />
-                </ConfirmSubmitButton>
-              </form>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </article>
     );
   }
@@ -287,26 +281,20 @@ export default async function SyllabusPage() {
         description="Organize tópicos e subtópicos por matéria para registrar exatamente o que foi estudado."
       />
 
-      {isOwner ? (
-        <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
-          <div className="flex items-center gap-3">
-            <FileText className="size-5 text-primary" aria-hidden="true" />
-            <div>
-              <h2 className="text-lg font-semibold">Adicionar tópico</h2>
-              <p className="text-sm text-muted-foreground">
-                Use tópicos principais e subtópicos para representar o edital.
-              </p>
-            </div>
+      <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
+        <div className="flex items-center gap-3">
+          <FileText className="size-5 text-primary" aria-hidden="true" />
+          <div>
+            <h2 className="text-lg font-semibold">Adicionar tópico</h2>
+            <p className="text-sm text-muted-foreground">
+              Use tópicos principais e subtópicos para representar o edital.
+            </p>
           </div>
-          <div className="mt-5">
-            <TopicForm subjects={activeSubjects} parentTopics={parentTopics} />
-          </div>
-        </section>
-      ) : (
-        <div className="rounded-2xl border bg-card p-4 text-sm text-muted-foreground">
-          Apenas o responsável pelo espaço pode alterar o edital.
         </div>
-      )}
+        <div className="mt-5">
+          <TopicForm subjects={activeSubjects} parentTopics={parentTopics} />
+        </div>
+      </section>
 
       <section className="space-y-5">
         <h2 className="text-lg font-semibold">Tópicos ativos</h2>

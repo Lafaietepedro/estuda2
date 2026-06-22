@@ -179,59 +179,55 @@ export default async function QuestionsPage({
                     <span className="rounded-full bg-emerald-50 px-3 py-1 text-sm font-semibold text-emerald-700">
                       {accuracy}%
                     </span>
-                    {log.userId === workspace.currentUser.id && (
-                      <>
-                        <details className="group">
-                          <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
-                            <Pencil className="size-4" aria-hidden="true" />
-                            <span className="sr-only">Editar registro</span>
-                          </summary>
-                          <div className="mt-3 rounded-xl border bg-muted/30 p-4 sm:absolute sm:right-10 sm:z-20 sm:w-[32rem] sm:bg-card sm:shadow-xl">
-                            <QuestionLogEditForm
-                              log={{
-                                id: log.id,
-                                subjectId: log.subjectId,
-                                topicId: log.topicId ?? "",
-                                answeredAt: formatDateInput(log.answeredAt),
-                                questionsAnswered: log.questionsAnswered,
-                                correctAnswers: log.correctAnswers,
-                                notes: log.notes ?? "",
-                              }}
-                              subjects={workspace.subjects.filter(
-                                (subject) =>
-                                  !subject.archivedAt ||
-                                  subject.id === log.subjectId,
-                              )}
-                              topics={topics
-                                .filter(
-                                  (topic) =>
-                                    !topic.archivedAt ||
-                                    topic.id === log.topicId,
-                                )
-                                .map((topic) => ({
-                                  id: topic.id,
-                                  name: topic.name,
-                                  subjectId: topic.subjectId,
-                                  subjectName: topic.subject.name,
-                                  parentName: topic.parent?.name ?? null,
-                                }))}
-                            />
-                          </div>
-                        </details>
-                        <form action={deleteQuestionLog}>
-                          <input type="hidden" name="id" value={log.id} />
-                          <ConfirmSubmitButton
-                            variant="ghost"
-                            size="icon"
-                            aria-label="Excluir registro"
-                            className="text-muted-foreground hover:text-destructive"
-                            confirmMessage="Excluir este registro de questões? Essa ação não pode ser desfeita."
-                          >
-                            <Trash2 aria-hidden="true" />
-                          </ConfirmSubmitButton>
-                        </form>
-                      </>
-                    )}
+                    <details className="group">
+                      <summary className="flex size-10 cursor-pointer list-none items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground">
+                        <Pencil className="size-4" aria-hidden="true" />
+                        <span className="sr-only">Editar registro</span>
+                      </summary>
+                      <div className="mt-3 rounded-xl border bg-muted/30 p-4 sm:absolute sm:right-10 sm:z-20 sm:w-[32rem] sm:bg-card sm:shadow-xl">
+                        <QuestionLogEditForm
+                          log={{
+                            id: log.id,
+                            subjectId: log.subjectId,
+                            topicId: log.topicId ?? "",
+                            answeredAt: formatDateInput(log.answeredAt),
+                            questionsAnswered: log.questionsAnswered,
+                            correctAnswers: log.correctAnswers,
+                            notes: log.notes ?? "",
+                          }}
+                          subjects={workspace.subjects.filter(
+                            (subject) =>
+                              !subject.archivedAt ||
+                              subject.id === log.subjectId,
+                          )}
+                          topics={topics
+                            .filter(
+                              (topic) =>
+                                !topic.archivedAt ||
+                                topic.id === log.topicId,
+                            )
+                            .map((topic) => ({
+                              id: topic.id,
+                              name: topic.name,
+                              subjectId: topic.subjectId,
+                              subjectName: topic.subject.name,
+                              parentName: topic.parent?.name ?? null,
+                            }))}
+                        />
+                      </div>
+                    </details>
+                    <form action={deleteQuestionLog}>
+                      <input type="hidden" name="id" value={log.id} />
+                      <ConfirmSubmitButton
+                        variant="ghost"
+                        size="icon"
+                        aria-label="Excluir registro"
+                        className="text-muted-foreground hover:text-destructive"
+                        confirmMessage="Excluir este registro de questões? Essa ação não pode ser desfeita."
+                      >
+                        <Trash2 aria-hidden="true" />
+                      </ConfirmSubmitButton>
+                    </form>
                   </div>
                 </article>
               );

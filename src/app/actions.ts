@@ -4,7 +4,6 @@ import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import {
-  ExamRole,
   PlanItemKind,
   Prisma,
   StudyTimerStatus,
@@ -94,14 +93,6 @@ function revalidateRecords() {
   revalidatePath("/planejamento");
   revalidatePath("/edital");
   revalidatePath("/foco");
-}
-
-async function requireOwner() {
-  const workspace = await getWorkspace();
-  if (workspace.currentMembership.role !== ExamRole.OWNER) {
-    throw new Error("Apenas o responsável pode alterar esta configuração.");
-  }
-  return workspace;
 }
 
 async function validateActiveSubject(subjectId: string) {
@@ -511,7 +502,6 @@ export async function updateStudySession(
       where: {
         id: parsed.data.id,
         examId: workspace.id,
-        userId: workspace.currentUser.id,
       },
     });
     if (!session) throw new Error("Sessão não encontrada.");
@@ -546,7 +536,7 @@ export async function updateStudySession(
   } catch {
     return {
       status: "error",
-      message: "Você só pode editar suas próprias sessões.",
+      message: "Não foi possível atualizar a sessão.",
     };
   }
 }
@@ -627,7 +617,6 @@ export async function updateQuestionLog(
       where: {
         id: parsed.data.id,
         examId: workspace.id,
-        userId: workspace.currentUser.id,
       },
     });
     if (!log) throw new Error("Registro não encontrado.");
@@ -660,7 +649,7 @@ export async function updateQuestionLog(
   } catch {
     return {
       status: "error",
-      message: "Você só pode editar seus próprios registros.",
+      message: "Não foi possível atualizar o registro.",
     };
   }
 }
@@ -739,7 +728,6 @@ export async function updatePlanItem(
       where: {
         id: parsed.data.id,
         examId: workspace.id,
-        userId: workspace.currentUser.id,
       },
     });
     if (!item) throw new Error("Atividade não encontrada.");
@@ -773,7 +761,7 @@ export async function updatePlanItem(
   } catch {
     return {
       status: "error",
-      message: "Você só pode editar suas próprias atividades.",
+      message: "Não foi possível atualizar a atividade.",
     };
   }
 }
@@ -792,7 +780,6 @@ export async function togglePlanItemCompletion(formData: FormData) {
     where: {
       id: parsed.data.id,
       examId: workspace.id,
-      userId: workspace.currentUser.id,
     },
     data: {
       completedAt: parsed.data.completed === "true" ? new Date() : null,
@@ -810,7 +797,6 @@ export async function deletePlanItem(formData: FormData) {
     where: {
       id: parsed.data.id,
       examId: workspace.id,
-      userId: workspace.currentUser.id,
     },
   });
   revalidateRecords();
@@ -872,7 +858,7 @@ export async function updateSubject(
   if (!parsed.success) return errorState(parsed.error);
 
   try {
-    const workspace = await requireOwner();
+    const workspace = await getWorkspace();
     const subject = workspace.subjects.find(
       (item) => item.id === parsed.data.id,
     );
@@ -942,7 +928,7 @@ export async function createTopic(
   if (!parsed.success) return errorState(parsed.error);
 
   try {
-    const workspace = await requireOwner();
+    const workspace = await getWorkspace();
     const subject = workspace.subjects.find(
       (item) => item.id === parsed.data.subjectId && !item.archivedAt,
     );
@@ -996,7 +982,7 @@ export async function updateTopic(
   if (!parsed.success) return errorState(parsed.error);
 
   try {
-    const workspace = await requireOwner();
+    const workspace = await getWorkspace();
     const topic = await prisma.topic.findFirst({
       where: { id: parsed.data.id, examId: workspace.id },
     });
@@ -1028,7 +1014,6 @@ export async function deleteStudySession(formData: FormData) {
     where: {
       id: parsed.data.id,
       examId: workspace.id,
-      userId: workspace.currentUser.id,
     },
   });
   revalidateRecords();
@@ -1043,7 +1028,6 @@ export async function deleteQuestionLog(formData: FormData) {
     where: {
       id: parsed.data.id,
       examId: workspace.id,
-      userId: workspace.currentUser.id,
     },
   });
   revalidateRecords();
@@ -1058,7 +1042,7 @@ export async function toggleTopicArchive(formData: FormData) {
     .safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
 
-  const workspace = await requireOwner();
+  const workspace = await getWorkspace();
   const archivedAt = parsed.data.archived === "true" ? new Date() : null;
   const topic = await prisma.topic.findFirst({
     where: { id: parsed.data.id, examId: workspace.id },
@@ -1084,7 +1068,7 @@ export async function reorderTopic(formData: FormData) {
     .safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
 
-  const workspace = await requireOwner();
+  const workspace = await getWorkspace();
   const topic = await prisma.topic.findFirst({
     where: { id: parsed.data.id, examId: workspace.id },
   });
@@ -1125,7 +1109,7 @@ export async function deleteTopic(formData: FormData) {
   const parsed = deleteSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
 
-  const workspace = await requireOwner();
+  const workspace = await getWorkspace();
   const topic = await prisma.topic.findFirst({
     where: { id: parsed.data.id, examId: workspace.id },
     include: {
@@ -1163,7 +1147,7 @@ export async function toggleSubjectArchive(formData: FormData) {
     .safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
 
-  const workspace = await requireOwner();
+  const workspace = await getWorkspace();
   await prisma.subject.updateMany({
     where: { id: parsed.data.id, examId: workspace.id },
     data: { archivedAt: parsed.data.archived === "true" ? new Date() : null },
@@ -1180,7 +1164,7 @@ export async function reorderSubject(formData: FormData) {
     .safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
 
-  const workspace = await requireOwner();
+  const workspace = await getWorkspace();
   const subject = workspace.subjects.find((item) => item.id === parsed.data.id);
   if (!subject) return;
 
@@ -1210,7 +1194,7 @@ export async function deleteSubject(formData: FormData) {
   const parsed = deleteSchema.safeParse(Object.fromEntries(formData));
   if (!parsed.success) return;
 
-  const workspace = await requireOwner();
+  const workspace = await getWorkspace();
   const subject = await prisma.subject.findFirst({
     where: { id: parsed.data.id, examId: workspace.id },
     include: {
@@ -1301,7 +1285,7 @@ export async function updateSettings(
   if (!parsed.success) return errorState(parsed.error);
 
   try {
-    const workspace = await requireOwner();
+    const workspace = await getWorkspace();
     const validUserIds = new Set(
       workspace.memberships.map((membership) => membership.userId),
     );

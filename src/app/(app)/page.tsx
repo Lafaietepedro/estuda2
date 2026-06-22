@@ -35,7 +35,6 @@ export const dynamic = "force-dynamic";
 export default async function DashboardPage() {
   const workspace = await getWorkspace();
   const needsSetup =
-    workspace.currentMembership.role === "OWNER" &&
     (workspace.name === "Nosso concurso" ||
       workspace.memberships.some((membership) =>
         /^Pessoa [12]$/.test(membership.user.name),

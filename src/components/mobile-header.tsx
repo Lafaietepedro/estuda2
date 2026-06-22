@@ -16,7 +16,7 @@ import {
 
 type MobileHeaderProps = {
   examName: string;
-  currentUser: { name: string; role: "OWNER" | "MEMBER" };
+  currentUser: { name: string };
   users: { id: string; name: string }[];
 };
 

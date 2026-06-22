@@ -76,7 +76,6 @@ export default async function SubjectsPage() {
   const planMap = new Map(
     planTotals.map((item) => [item.subjectId, item._count]),
   );
-  const isOwner = workspace.currentMembership.role === "OWNER";
   const activeSubjects = workspace.subjects.filter(
     (subject) => !subject.archivedAt,
   );
@@ -124,36 +123,34 @@ export default async function SubjectsPage() {
             </div>
           </div>
 
-          {isOwner && (
-            <div className="flex shrink-0 items-center">
-              <form action={reorderSubject}>
-                <input type="hidden" name="id" value={subject.id} />
-                <input type="hidden" name="direction" value="up" />
-                <Button
-                  type="submit"
-                  variant="ghost"
-                  size="icon"
-                  disabled={index === 0}
-                  aria-label="Mover matéria para cima"
-                >
-                  <ArrowUp aria-hidden="true" />
-                </Button>
-              </form>
-              <form action={reorderSubject}>
-                <input type="hidden" name="id" value={subject.id} />
-                <input type="hidden" name="direction" value="down" />
-                <Button
-                  type="submit"
-                  variant="ghost"
-                  size="icon"
-                  disabled={index === listLength - 1}
-                  aria-label="Mover matéria para baixo"
-                >
-                  <ArrowDown aria-hidden="true" />
-                </Button>
-              </form>
-            </div>
-          )}
+          <div className="flex shrink-0 items-center">
+            <form action={reorderSubject}>
+              <input type="hidden" name="id" value={subject.id} />
+              <input type="hidden" name="direction" value="up" />
+              <Button
+                type="submit"
+                variant="ghost"
+                size="icon"
+                disabled={index === 0}
+                aria-label="Mover matéria para cima"
+              >
+                <ArrowUp aria-hidden="true" />
+              </Button>
+            </form>
+            <form action={reorderSubject}>
+              <input type="hidden" name="id" value={subject.id} />
+              <input type="hidden" name="direction" value="down" />
+              <Button
+                type="submit"
+                variant="ghost"
+                size="icon"
+                disabled={index === listLength - 1}
+                aria-label="Mover matéria para baixo"
+              >
+                <ArrowDown aria-hidden="true" />
+              </Button>
+            </form>
+          </div>
         </div>
 
         <dl className="mt-6 grid grid-cols-2 gap-4">
@@ -196,49 +193,47 @@ export default async function SubjectsPage() {
           </div>
         )}
 
-        {isOwner && (
-          <div className="mt-5 flex flex-wrap items-center gap-1 border-t pt-4">
-            <details className="group flex-1">
-              <summary className="flex h-9 cursor-pointer list-none items-center justify-center gap-2 rounded-md px-3 text-sm font-medium hover:bg-accent">
-                <Pencil className="size-4" aria-hidden="true" />
-                Editar
-              </summary>
-              <div className="mt-3 rounded-xl border bg-muted/30 p-4">
-                <SubjectEditForm subject={subject} />
-              </div>
-            </details>
-            <form action={toggleSubjectArchive}>
+        <div className="mt-5 flex flex-wrap items-center gap-1 border-t pt-4">
+          <details className="group flex-1">
+            <summary className="flex h-9 cursor-pointer list-none items-center justify-center gap-2 rounded-md px-3 text-sm font-medium hover:bg-accent">
+              <Pencil className="size-4" aria-hidden="true" />
+              Editar
+            </summary>
+            <div className="mt-3 rounded-xl border bg-muted/30 p-4">
+              <SubjectEditForm subject={subject} />
+            </div>
+          </details>
+          <form action={toggleSubjectArchive}>
+            <input type="hidden" name="id" value={subject.id} />
+            <input
+              type="hidden"
+              name="archived"
+              value={subject.archivedAt ? "false" : "true"}
+            />
+            <Button type="submit" variant="ghost" size="sm">
+              {subject.archivedAt ? (
+                <RotateCcw aria-hidden="true" />
+              ) : (
+                <Archive aria-hidden="true" />
+              )}
+              {subject.archivedAt ? "Reativar" : "Arquivar"}
+            </Button>
+          </form>
+          {historyCount === 0 && (
+            <form action={deleteSubject}>
               <input type="hidden" name="id" value={subject.id} />
-              <input
-                type="hidden"
-                name="archived"
-                value={subject.archivedAt ? "false" : "true"}
-              />
-              <Button type="submit" variant="ghost" size="sm">
-                {subject.archivedAt ? (
-                  <RotateCcw aria-hidden="true" />
-                ) : (
-                  <Archive aria-hidden="true" />
-                )}
-                {subject.archivedAt ? "Reativar" : "Arquivar"}
-              </Button>
+              <ConfirmSubmitButton
+                variant="ghost"
+                size="icon"
+                aria-label="Excluir matéria sem histórico"
+                className="text-muted-foreground hover:text-destructive"
+                confirmMessage={`Excluir definitivamente a matéria ${subject.name}?`}
+              >
+                <Trash2 aria-hidden="true" />
+              </ConfirmSubmitButton>
             </form>
-            {historyCount === 0 && (
-              <form action={deleteSubject}>
-                <input type="hidden" name="id" value={subject.id} />
-                <ConfirmSubmitButton
-                  variant="ghost"
-                  size="icon"
-                  aria-label="Excluir matéria sem histórico"
-                  className="text-muted-foreground hover:text-destructive"
-                  confirmMessage={`Excluir definitivamente a matéria ${subject.name}?`}
-                >
-                  <Trash2 aria-hidden="true" />
-                </ConfirmSubmitButton>
-              </form>
-            )}
-          </div>
-        )}
+          )}
+        </div>
       </article>
     );
   }
@@ -254,8 +249,8 @@ export default async function SubjectsPage() {
       <section className="rounded-2xl border bg-card p-5 shadow-sm sm:p-6">
         <h2 className="text-lg font-semibold">Adicionar matéria</h2>
         <p className="mt-1 text-sm text-muted-foreground">
-          Qualquer pessoa da dupla pode adicionar novas matérias ao plano.
-          Edição, ordenação e arquivamento continuam com o responsável.
+          Qualquer pessoa da dupla pode adicionar, editar, ordenar e arquivar
+          matérias do plano.
         </p>
         <div className="mt-5">
           <SubjectForm />

@@ -41,7 +41,7 @@ export function SettingsForm({ exam, users }: SettingsFormProps) {
           return (
             <fieldset key={user.id} className="space-y-4 rounded-xl border p-4">
               <legend className="px-2 text-sm font-semibold">
-                {index === 0 ? "Responsável" : "Segundo integrante"}
+                {index === 0 ? "Pessoa 1" : "Pessoa 2"}
               </legend>
               <label className="block text-sm font-medium">
                 Nome

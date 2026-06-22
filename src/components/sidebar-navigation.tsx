@@ -44,7 +44,7 @@ const navigationItems: NavigationItem[] = [
 
 type SidebarNavigationProps = {
   examName: string;
-  currentUser: { name: string; role: "OWNER" | "MEMBER" };
+  currentUser: { name: string };
   users: { id: string; name: string }[];
   onNavigate?: () => void;
 };
@@ -135,8 +135,7 @@ export function SidebarNavigation({
               {currentUser.name}
             </p>
             <p className="truncate text-xs text-muted-foreground">
-              {currentUser.role === "OWNER" ? "Responsável" : "Integrante"} ·{" "}
-              {firstUser} & {secondUser}
+              Dupla · {firstUser} & {secondUser}
             </p>
           </div>
         </div>
