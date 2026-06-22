@@ -27,6 +27,7 @@ import {
   startOfCurrentWeek,
 } from "@/lib/dates";
 import { prisma } from "@/lib/prisma";
+import { findActiveStudyTimer } from "@/lib/study-timer-data";
 import { secondsToHuman, timerNetSeconds } from "@/lib/study-timer";
 import { cn } from "@/lib/utils";
 
@@ -55,16 +56,9 @@ export default async function DashboardPage() {
     todayPlanCount,
     overduePlanCount,
   ] = await Promise.all([
-    prisma.studyTimer.findFirst({
-      where: {
-        examId: workspace.id,
-        userId: workspace.currentUser.id,
-        status: {
-          in: [StudyTimerStatus.RUNNING, StudyTimerStatus.PAUSED],
-        },
-      },
-      orderBy: { startedAt: "desc" },
-      include: { subject: true, topic: { include: { parent: true } } },
+    findActiveStudyTimer({
+      examId: workspace.id,
+      userId: workspace.currentUser.id,
     }),
     prisma.studySession.findMany({
       where: { examId: workspace.id, studiedAt: { gte: sevenDaysAgo } },
